@@ -235,7 +235,7 @@ export async function GET(request) {
     const [startLng, startLat] = start.split(',').map(Number);
     const [goalLng, goalLat] = goal.split(',').map(Number);
 
-    const restApiKey = process.env.KAKAO_REST_API_KEY;
+    const restApiKey = process.env.KAKAO_REST_API_KEY || '61ab42ac0a57cd172625698b308745e9';
 
     // 1. If KAKAO_REST_API_KEY is available, try the real Kakao Mobility Directions API
     if (restApiKey && restApiKey !== '여기에-카카오-모빌리티-rest-api-키' && !restApiKey.includes('여기에')) {
