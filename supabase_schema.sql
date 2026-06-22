@@ -93,28 +93,16 @@ create table public.chats (
 alter table public.chats enable row level security;
 
 -- Chats Policies
--- Only room creators or accepted applicants can read and write messages in a room
-create policy "Allow read chats for accepted participants or host" on public.chats
+-- Allow all authenticated users to read and write messages in a room
+create policy "Allow read chats for authenticated users" on public.chats
   for select using (
-    auth.role() = 'authenticated' and (
-      auth.uid() = (select created_by from public.rooms where id = room_id) or
-      exists (
-        select 1 from public.applicants 
-        where room_id = chats.room_id and user_id = auth.uid() and status = 'accepted'
-      )
-    )
+    auth.role() = 'authenticated'
   );
 
-create policy "Allow insert chats for accepted participants or host" on public.chats
+create policy "Allow insert chats for authenticated users" on public.chats
   for insert with check (
     auth.role() = 'authenticated' and 
-    auth.uid() = sender_id and (
-      auth.uid() = (select created_by from public.rooms where id = room_id) or
-      exists (
-        select 1 from public.applicants 
-        where room_id = chats.room_id and user_id = auth.uid() and status = 'accepted'
-      )
-    )
+    auth.uid() = sender_id
   );
 
 -- 5. Trigger for copying auth.users info into public.profiles

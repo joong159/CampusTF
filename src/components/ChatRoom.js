@@ -273,7 +273,55 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
           )}
         </div>
 
-        {/* Settlement Info / Account Guide Banner */}
+        {/* Application Status Banner (Visible to non-hosts) */}
+        {!isHost && (
+          <div className="border border-theme-border rounded-2xl p-4 bg-theme-panel flex flex-col gap-2.5 transition-colors shadow-sm">
+            {myStatus === 'none' && (
+              <div className="flex flex-col gap-2">
+                <p className="text-xs text-theme-text-secondary leading-normal">
+                  🙋‍♂️ 함께 이동하고 싶으신가요? 아래 버튼을 눌러 동승 신청을 해보세요. 방장이 수락하면 계좌가 공개됩니다.
+                </p>
+                <button
+                  type="button"
+                  onClick={handleApply}
+                  className="w-full py-3 bg-[#003893] hover:bg-[#002a70] text-white text-xs font-bold rounded-xl shadow-md transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 cursor-pointer"
+                  style={{ minHeight: '40px' }}
+                >
+                  🚕 이 팟에 동승 신청하기
+                </button>
+              </div>
+            )}
+            
+            {myStatus === 'pending' && (
+              <div className="flex items-center justify-between text-xs font-medium text-amber-600 bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 transition-colors">
+                <span className="flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-ping"></span>
+                  참여 신청이 대기 중입니다.
+                </span>
+                <span className="text-[9px] bg-amber-500/20 px-2 py-0.5 rounded font-black uppercase">수락 대기 중</span>
+              </div>
+            )}
+            
+            {myStatus === 'accepted' && (
+              <div className="flex items-center justify-between text-xs font-medium text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 transition-colors">
+                <span className="flex items-center gap-1.5">
+                  <Check size={14} className="text-emerald-500" />
+                  동승 참여가 최종 승인되었습니다!
+                </span>
+                <span className="text-[9px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded font-black uppercase">승인 완료</span>
+              </div>
+            )}
+            
+            {myStatus === 'rejected' && (
+              <div className="flex items-center justify-between text-xs font-medium text-red-500 bg-red-500/10 border border-red-500/20 rounded-xl p-3 transition-colors">
+                <span>동승 참여 신청이 거절되었습니다.</span>
+                <span className="text-[9px] bg-red-500/20 text-red-500 px-2 py-0.5 rounded font-black uppercase">거절됨</span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Settlement Info / Account Guide Banner (LOCKED for non-accepted guests) */}
         <div className="border border-theme-border rounded-2xl p-3.5 bg-theme-panel flex flex-col gap-2.5 transition-colors">
           <div className="flex items-center justify-between">
             <span className="font-bold text-theme-text-primary flex items-center gap-1.5 transition-colors">
@@ -283,29 +331,37 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
             <span className="text-[9px] text-theme-text-muted font-bold transition-colors">방장 학번: {room.host.student_id}</span>
           </div>
           
-          <div className="flex items-center justify-between bg-theme-input border border-theme-input-border rounded-xl p-2.5 transition-colors">
-            <span className="font-extrabold text-theme-text-primary text-xs tracking-wide transition-colors">{room.bank_account}</span>
-            <button
-              onClick={handleCopyAccount}
-              className="text-theme-blue text-xs font-bold flex items-center gap-0.5 hover:underline cursor-pointer"
-              style={{ minHeight: '28px' }}
-            >
-              {copied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
-              {copied ? '복사됨' : '복사'}
-            </button>
-          </div>
+          {isHost || myStatus === 'accepted' ? (
+            <>
+              <div className="flex items-center justify-between bg-theme-input border border-theme-input-border rounded-xl p-2.5 transition-colors">
+                <span className="font-extrabold text-theme-text-primary text-xs tracking-wide transition-colors">{room.bank_account}</span>
+                <button
+                  onClick={handleCopyAccount}
+                  className="text-theme-blue text-xs font-bold flex items-center gap-0.5 hover:underline cursor-pointer"
+                  style={{ minHeight: '28px' }}
+                >
+                  {copied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+                  {copied ? '복사됨' : '복사'}
+                </button>
+              </div>
 
-          {room.kakaopay_url && (
-            <a
-              href={room.kakaopay_url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="w-full py-2 bg-yellow-400 hover:bg-yellow-500 text-yellow-950 text-xs font-bold rounded-xl flex items-center justify-center gap-1 transition-colors shadow-sm"
-              style={{ minHeight: '36px' }}
-            >
-              <ExternalLink size={13} />
-              카카오페이 빠른 송금
-            </a>
+              {room.kakaopay_url && (
+                <a
+                  href={room.kakaopay_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="w-full py-2 bg-yellow-400 hover:bg-yellow-500 text-yellow-955 text-xs font-bold rounded-xl flex items-center justify-center gap-1 transition-colors shadow-sm"
+                  style={{ minHeight: '36px' }}
+                >
+                  <ExternalLink size={13} />
+                  카카오페이 빠른 송금
+                </a>
+              )}
+            </>
+          ) : (
+            <div className="bg-theme-input border border-dashed border-theme-border rounded-xl p-3.5 text-center text-theme-text-muted text-xs flex items-center justify-center gap-1.5 font-medium transition-colors">
+              <span>🔒 계좌 정보는 방장이 신청을 수락하면 공개됩니다.</span>
+            </div>
           )}
         </div>
 
@@ -317,7 +373,7 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
                 <Calculator size={15} className="text-emerald-500 animate-pulse" />
                 자동 N분의 1 정산 안내
               </span>
-              <span className="px-2 py-0.5 bg-emerald-500/20 text-emerald-400 text-[9px] font-black rounded-md uppercase tracking-wider">정산 진행 중</span>
+              <span className="text-[9px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded font-black uppercase tracking-wider">정산 진행 중</span>
             </div>
             
             <div className="bg-theme-input border border-theme-input-border rounded-2xl p-3.5 space-y-1.5 transition-colors">
@@ -329,101 +385,87 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
                 <span>탑승 인원 (방장 포함)</span>
                 <span className="font-bold text-theme-text-primary">{participantsCount}명</span>
               </div>
-              <div className="flex justify-between items-center pt-1.5">
-                <span className="font-extrabold text-theme-text-primary text-xs">1인당 송금 금액</span>
-                <span className="text-base font-black text-red-500">{calculatePerPerson().toLocaleString()}원</span>
+              <div className="flex justify-between items-center pt-1">
+                <span className="font-bold text-theme-text-primary text-xs">1인당 송금 금액</span>
+                <span className="text-sm font-black text-red-500">{calculatePerPerson().toLocaleString()}원</span>
               </div>
             </div>
-            <p className="text-[9px] text-theme-text-muted leading-normal font-semibold transition-colors">
-              * 위 계좌정보 또는 카카오페이 버튼을 이용해 <strong className="text-red-400">{calculatePerPerson().toLocaleString()}원</strong>을 송금한 후 완료했다고 톡으로 알려주세요!
-            </p>
           </div>
         )}
       </div>
 
       {/* 4. Chat Messages Area */}
-      {isHost || myStatus === 'accepted' ? (
-        <div className="flex-grow flex flex-col overflow-y-auto px-4 py-4 space-y-4 pb-20 bg-slate-50 transition-colors">
-          {messages.length === 0 ? (
-            <div className="text-center py-10">
-              <p className="text-xs text-gray-400 font-bold">동승자들과 대화를 시작해 보세요!</p>
-            </div>
-          ) : (
-            messages.map((msg) => {
-              const isMe = msg.sender_id === user.id;
-              return (
-                <div
-                  key={msg.id}
-                  className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
-                >
-                  {/* Sender ID */}
-                  <span className="text-[10px] font-bold text-gray-400 mb-1 px-1">
-                    {isMe ? '나' : `학번 ${msg.sender.student_id} (${msg.sender.gender})`}
-                  </span>
-                  
-                  {/* Bubble */}
-                  <div
-                    className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-sm shadow-sm ${
-                      isMe
-                        ? 'bg-[#003893] text-white rounded-tr-none'
-                        : 'bg-white text-gray-800 border border-gray-100 rounded-tl-none'
-                    }`}
-                    style={{ wordBreak: 'break-all' }}
-                  >
-                    {msg.content}
-                  </div>
-                  
-                  {/* Time */}
-                  <span className="text-[9px] text-gray-400 mt-1 px-1">
-                    {new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })}
-                  </span>
-                </div>
-              );
-            })
-          )}
-          <div ref={messagesEndRef} />
-        </div>
-      ) : (
-        <div className="flex-grow flex flex-col items-center justify-center p-6 text-center space-y-3 bg-gray-50 border-y border-gray-150">
-          <div className="w-14 h-14 bg-[#EBF2FF] text-[#003893] rounded-full flex items-center justify-center text-xl shadow-inner animate-pulse">
-            🔒
+      <div className="flex-grow flex flex-col overflow-y-auto px-4 py-4 space-y-4 pb-20 bg-theme-panel/20 transition-colors">
+        {messages.length === 0 ? (
+          <div className="text-center py-10">
+            <p className="text-xs text-theme-text-muted font-bold transition-colors">동승자들과 대화를 시작해 보세요!</p>
           </div>
-          <h3 className="font-bold text-sm text-gray-800">동승 팀원 전용 대화방</h3>
-          <p className="text-xs text-gray-455 max-w-[280px] leading-relaxed">
-            방장이 동승 참여 신청을 수락하면 실시간 채팅 대화와 상대방 학번 정보가 공개됩니다.
-          </p>
-        </div>
-      )}
+        ) : (
+          messages.map((msg) => {
+            const isMe = msg.sender_id === user.id;
+            return (
+              <div
+                key={msg.id}
+                className={`flex flex-col ${isMe ? 'items-end' : 'items-start'}`}
+              >
+                {/* Sender ID */}
+                <span className="text-[10px] font-bold text-theme-text-muted mb-1 px-1 transition-colors">
+                  {isMe ? '나' : `학번 ${msg.sender.student_id} (${msg.sender.gender})`}
+                </span>
+                
+                {/* Bubble */}
+                <div
+                  className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-xs shadow-sm transition-all select-all ${
+                    isMe
+                      ? 'bg-gradient-to-r from-[#003893] to-[#0055d2] text-white rounded-tr-none'
+                      : 'bg-theme-panel border border-theme-border text-theme-text-primary rounded-tl-none'
+                  }`}
+                  style={{ wordBreak: 'break-all' }}
+                >
+                  {msg.content}
+                </div>
+                
+                {/* Time */}
+                <span className="text-[9px] text-theme-text-muted mt-1 px-1 transition-colors">
+                  {new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })}
+                </span>
+              </div>
+            );
+          })
+        )}
+        <div ref={messagesEndRef} />
+      </div>
 
+      {/* 5. Chat Input Bar */}
       {/* 5. Chat Input Bar or Application Buttons */}
       {isHost || myStatus === 'accepted' ? (
         <form
           onSubmit={handleSendMessage}
-          className="sticky bottom-0 bg-white border-t border-gray-100 p-3 flex items-center gap-2 z-10"
+          className="sticky bottom-0 bg-theme-header border-t border-theme-header-border p-3 flex items-center gap-2.5 z-10 transition-colors"
         >
           <input
             type="text"
             value={inputValue}
             onChange={(e) => setInputValue(e.target.value)}
             placeholder="메시지를 입력하세요..."
-            className="flex-1 px-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#003893] focus:bg-white text-gray-850"
-            style={{ minHeight: '48px' }}
+            className="flex-1 px-4 py-3 bg-theme-input border border-theme-input-border rounded-2xl text-xs focus:outline-none focus:border-theme-input-focus text-theme-text-primary placeholder-theme-text-muted/60 transition-all"
+            style={{ minHeight: '44px' }}
           />
           <button
             type="submit"
-            className="w-12 h-12 bg-[#003893] hover:bg-[#002a70] text-white rounded-xl flex items-center justify-center transition-colors shadow-md active:scale-95"
-            style={{ minHeight: '48px', minWidth: '48px' }}
+            className="w-11 h-11 bg-gradient-to-tr from-[#003893] to-blue-500 hover:scale-[1.05] active:scale-[0.9] text-white rounded-2xl flex items-center justify-center transition-all shadow-sm cursor-pointer"
+            style={{ minHeight: '40px', minWidth: '40px' }}
           >
             <Send size={18} />
           </button>
         </form>
       ) : (
-        <div className="sticky bottom-0 bg-white border-t border-gray-150 p-4 z-10 flex flex-col gap-2">
+        <div className="sticky bottom-0 bg-theme-header border-t border-theme-header-border p-4 z-10 flex flex-col gap-2 transition-colors">
           {myStatus === 'none' && (
             <button
               type="button"
               onClick={handleApply}
-              className="w-full py-3.5 bg-[#003893] hover:bg-[#002a70] text-white text-xs font-bold rounded-2xl shadow-md transition-all active:scale-[0.98] flex items-center justify-center gap-1.5"
+              className="w-full py-3.5 bg-gradient-to-r from-[#003893] to-blue-600 hover:from-theme-blue hover:to-blue-500 text-white text-xs font-bold rounded-2xl shadow-sm transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 cursor-pointer"
               style={{ minHeight: '48px' }}
             >
               🚕 이 팟에 동승 참여 신청하기
@@ -434,7 +476,7 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
             <button
               type="button"
               disabled
-              className="w-full py-3.5 bg-amber-50 text-amber-600 border border-amber-200 text-xs font-bold rounded-2xl flex items-center justify-center gap-1.5"
+              className="w-full py-3.5 bg-amber-500/10 text-amber-500 border border-amber-500/20 text-xs font-bold rounded-2xl flex items-center justify-center gap-1.5"
               style={{ minHeight: '48px' }}
             >
               <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping"></span>
@@ -446,7 +488,7 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
             <button
               type="button"
               disabled
-              className="w-full py-3.5 bg-red-50 text-red-500 border border-red-150 text-xs font-bold rounded-2xl"
+              className="w-full py-3.5 bg-red-500/10 text-red-500 border border-red-500/20 text-xs font-bold rounded-2xl"
               style={{ minHeight: '48px' }}
             >
               동승 신청이 거절됨

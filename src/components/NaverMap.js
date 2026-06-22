@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { MapPin, Navigation, Compass, AlertCircle, Play, Square } from 'lucide-react';
 
-const naverClientId = process.env.NEXT_PUBLIC_NAVER_MAPS_CLIENT_ID;
+const naverClientId = process.env.NEXT_PUBLIC_NAVER_MAPS_CLIENT_ID || 'e4er7uvr2b';
 
 const isNaverConfigured = !!(
   naverClientId &&
@@ -66,6 +66,7 @@ export default function NaverMap({ departure, destination }) {
   const [mapError, setMapError] = useState(false);
   const [isSimulating, setIsSimulating] = useState(false);
   const [mockProgress, setMockProgress] = useState(0); // 0 to 100 for SVG animation
+  const [routePath, setRoutePath] = useState([]); // Array of { lat, lng }
   
   const mapRef = useRef(null);
   const carMarkerRef = useRef(null);
@@ -73,6 +74,35 @@ export default function NaverMap({ departure, destination }) {
 
   const depCoords = getCoordinates(departure, LANDMARK_COORDS.station);
   const destCoords = getCoordinates(destination, LANDMARK_COORDS.main_gate);
+
+  useEffect(() => {
+    let active = true;
+    const fetchRoute = async () => {
+      try {
+        const res = await fetch(`/api/directions?start=${depCoords.lng},${depCoords.lat}&goal=${destCoords.lng},${destCoords.lat}`);
+        if (res.ok) {
+          const data = await res.json();
+          if (active && data.path && data.path.length > 0) {
+            setRoutePath(data.path);
+            return;
+          }
+        }
+      } catch (e) {
+        console.error('Failed to fetch route:', e);
+      }
+      if (active) {
+        setRoutePath([
+          { lat: depCoords.lat, lng: depCoords.lng },
+          { lat: destCoords.lat, lng: destCoords.lng }
+        ]);
+      }
+    };
+
+    fetchRoute();
+    return () => {
+      active = false;
+    };
+  }, [departure, destination, depCoords.lat, depCoords.lng, destCoords.lat, destCoords.lng]);
 
   useEffect(() => {
     if (typeof window !== 'undefined') {
@@ -120,9 +150,14 @@ export default function NaverMap({ departure, destination }) {
     stopSimulation();
     setIsSimulating(true);
 
+    const pathPoints = routePath.length > 0 ? routePath : [
+      { lat: depCoords.lat, lng: depCoords.lng },
+      { lat: destCoords.lat, lng: destCoords.lng }
+    ];
+    
     let progress = 0;
-    const steps = 30; // 30 updates
-    const intervalMs = 250; // Total 7.5 seconds
+    const steps = Math.max(30, pathPoints.length * 3); // 3 steps per node or at least 30
+    const intervalMs = Math.max(100, Math.floor(7500 / steps)); // Total ~7.5 seconds
 
     if (!isNaverConfigured || mapError) {
       // SVG Mock Simulation
@@ -144,14 +179,15 @@ export default function NaverMap({ departure, destination }) {
       const naver = window.naver;
       if (!naver || !mapRef.current) return;
 
+      const startPt = pathPoints[0];
       // Create taxi marker icon
       const carMarker = new naver.maps.Marker({
-        position: new naver.maps.LatLng(depCoords.lat, depCoords.lng),
+        position: new naver.maps.LatLng(startPt.lat, startPt.lng),
         map: mapRef.current,
         title: '택시 이동 중',
         icon: {
           content: `
-            <div style="background-color: #f59e0b; color: white; padding: 5px; border-radius: 50%; border: 2.5px solid white; box-shadow: 0 4px 6px rgba(0,0,0,0.3); width: 34px; height: 34px; display: flex; items-center; justify-content: center; font-size: 16px; animation: bounce 0.5s infinite alternate;">
+            <div style="background-color: #f59e0b; color: white; padding: 5px; border-radius: 50%; border: 2.5px solid white; box-shadow: 0 4px 6px rgba(0,0,0,0.3); width: 34px; height: 34px; display: flex; align-items: center; justify-content: center; font-size: 16px; animation: bounce 0.5s infinite alternate;">
               🚕
             </div>
           `,
@@ -161,25 +197,37 @@ export default function NaverMap({ departure, destination }) {
       });
       carMarkerRef.current = carMarker;
 
+      const totalPoints = pathPoints.length;
       simIntervalRef.current = setInterval(() => {
         progress += 1;
         const t = progress / steps;
 
         if (t >= 1) {
-          carMarker.setPosition(new naver.maps.LatLng(destCoords.lat, destCoords.lng));
-          mapRef.current.panTo(new naver.maps.LatLng(destCoords.lat, destCoords.lng));
+          const destPt = pathPoints[totalPoints - 1];
+          carMarker.setPosition(new naver.maps.LatLng(destPt.lat, destPt.lng));
+          mapRef.current.panTo(new naver.maps.LatLng(destPt.lat, destPt.lng));
           clearInterval(simIntervalRef.current);
           setIsSimulating(false);
           alert('목적지에 도착했습니다! 요금을 확인해 주세요.');
           carMarker.setMap(null);
           carMarkerRef.current = null;
         } else {
-          const lat = depCoords.lat + (destCoords.lat - depCoords.lat) * t;
-          const lng = depCoords.lng + (destCoords.lng - depCoords.lng) * t;
-          const newPos = new naver.maps.LatLng(lat, lng);
-          
-          carMarker.setPosition(newPos);
-          mapRef.current.panTo(newPos);
+          // Find which segment we are currently in
+          const rawIndex = t * (totalPoints - 1);
+          const segmentIndex = Math.floor(rawIndex);
+          const segmentT = rawIndex - segmentIndex;
+
+          const p1 = pathPoints[segmentIndex];
+          const p2 = pathPoints[segmentIndex + 1];
+
+          if (p1 && p2) {
+            const lat = p1.lat + (p2.lat - p1.lat) * segmentT;
+            const lng = p1.lng + (p2.lng - p1.lng) * segmentT;
+            const newPos = new naver.maps.LatLng(lat, lng);
+            
+            carMarker.setPosition(newPos);
+            mapRef.current.panTo(newPos);
+          }
         }
       }, intervalMs);
 
@@ -190,7 +238,7 @@ export default function NaverMap({ departure, destination }) {
   };
 
   useEffect(() => {
-    if (!scriptLoaded || !isNaverConfigured || !mapContainerRef.current) return;
+    if (!scriptLoaded || !isNaverConfigured || !mapContainerRef.current || routePath.length === 0) return;
 
     try {
       const naver = window.naver;
@@ -252,37 +300,27 @@ export default function NaverMap({ departure, destination }) {
         },
       });
 
-      // Polyline Path
+      // Polyline Path using routePath coordinates
+      const naverPath = routePath.map(pt => new naver.maps.LatLng(pt.lat, pt.lng));
       new naver.maps.Polyline({
         map: map,
-        path: [
-          new naver.maps.LatLng(depCoords.lat, depCoords.lng),
-          new naver.maps.LatLng(destCoords.lat, destCoords.lng),
-        ],
+        path: naverPath,
         strokeColor: '#003893',
-        strokeWeight: 4,
-        strokeOpacity: 0.8,
-        strokeStyle: 'dash',
+        strokeWeight: 5,
+        strokeOpacity: 0.9,
+        strokeStyle: 'solid',
       });
 
       // Bounds fit
-      const bounds = new naver.maps.LatLngBounds(
-        new naver.maps.LatLng(
-          Math.min(depCoords.lat, destCoords.lat) - 0.005,
-          Math.min(depCoords.lng, destCoords.lng) - 0.005
-        ),
-        new naver.maps.LatLng(
-          Math.max(depCoords.lat, destCoords.lat) + 0.005,
-          Math.max(depCoords.lng, destCoords.lng) + 0.005
-        )
-      );
+      const bounds = new naver.maps.LatLngBounds();
+      naverPath.forEach(latlng => bounds.extend(latlng));
       map.fitBounds(bounds);
 
     } catch (e) {
       console.error('Failed to render Naver Map:', e);
       setMapError(true);
     }
-  }, [scriptLoaded, departure, destination, depCoords.lat, depCoords.lng, destCoords.lat, destCoords.lng]);
+  }, [scriptLoaded, departure, destination, depCoords.lat, depCoords.lng, destCoords.lat, destCoords.lng, routePath]);
 
   // Render Mock fallback if Naver is not configured
   if (!isNaverConfigured || mapError) {
@@ -363,7 +401,7 @@ export default function NaverMap({ departure, destination }) {
     <div className="w-full h-44 rounded-xl overflow-hidden border border-theme-border relative shadow-sm">
       <div ref={mapContainerRef} className="w-full h-full bg-gray-50" />
       
-      {!scriptLoaded && (
+      {(!scriptLoaded || routePath.length === 0) && (
         <div className="absolute inset-0 bg-slate-500/10 backdrop-blur-sm flex items-center justify-center">
           <span className="w-5 h-5 border-2 border-theme-blue border-t-transparent rounded-full animate-spin"></span>
         </div>
