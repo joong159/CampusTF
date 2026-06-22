@@ -521,7 +521,7 @@ export default function KakaoMap({ departure, destination, onRouteInfoUpdate, mi
   };
 
   return (
-    <div className="w-full h-44 rounded-xl overflow-hidden border border-theme-border relative shadow-inner">
+    <div className="w-full h-24 rounded-lg overflow-hidden border border-theme-border relative shadow-inner">
       {/* Map rendering layer */}
       {isLeafletMode ? (
         <div ref={leafletMapContainerRef} className="w-full h-full animate-fade-in" style={{ backgroundColor: '#e5e7eb' }} />

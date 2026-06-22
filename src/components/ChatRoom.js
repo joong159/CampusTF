@@ -451,47 +451,42 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
       </header>
 
       {/* 2. Top Info Banners (Sticky) */}
-      <div className="bg-theme-panel border-b border-theme-border p-3 text-xs space-y-2.5 z-5 transition-colors">
+      <div className="bg-theme-panel border-b border-theme-border p-2 text-xs space-y-1.5 z-5 transition-colors">
         {/* Taxi Fare Banner - Show to all users when room has total_fare */}
         {room && room.total_fare > 0 && (
-          <div className="bg-gradient-to-r from-green-500/20 to-emerald-500/20 border-2 border-green-500/50 text-green-700 rounded-2xl p-3.5 flex items-start gap-3 transition-colors shadow-lg shadow-green-500/10">
-            <CreditCard size={18} className="text-green-600 shrink-0 mt-0.5 animate-bounce" />
-            <div className="leading-normal flex-1">
-              <p className="font-black text-green-700 text-sm">💰 방장이 설정한 택시 총 요금</p>
-              <p className="text-lg font-black text-green-600 mt-2 mb-2">{room.total_fare.toLocaleString()}원</p>
-              <div className="bg-white/20 rounded-xl p-2 backdrop-blur-sm">
-                <p className="text-xs font-bold text-green-700">📊 인원 분담금 (현재 {participantsCount}명)</p>
-                <p className="text-sm font-black text-green-600 mt-1">1인당 약 {Math.round(room.total_fare / participantsCount / 10) * 10}원</p>
-              </div>
+          <div className="bg-gradient-to-r from-green-500/20 to-emerald-500/20 border border-green-500/30 text-green-700 rounded-lg p-2 flex items-center gap-2 transition-colors">
+            <CreditCard size={14} className="text-green-600 shrink-0 animate-bounce" />
+            <div className="flex-1 leading-tight">
+              <p className="font-black text-green-700 text-xs">💰 {room.total_fare.toLocaleString()}원 / 1인 약 {Math.round(room.total_fare / participantsCount / 10) * 10}원</p>
             </div>
           </div>
         )}
 
         {/* Warning Banner */}
-        <div className="bg-amber-500/10 border border-theme-gold/20 text-theme-gold rounded-2xl p-3 flex items-start gap-2 transition-colors">
-          <AlertTriangle size={15} className="text-theme-gold shrink-0 mt-0.5 animate-pulse" />
-          <p className="leading-normal font-semibold">
-            <strong>안내:</strong> 실제 탑승 이동 완료 후 계좌 정보를 통해 방장에게 N분의 1 금액 송금을 진행해 주세요.
+        <div className="bg-amber-500/10 border border-theme-gold/20 text-theme-gold rounded-lg p-1.5 flex items-start gap-1 transition-colors">
+          <AlertTriangle size={11} className="text-theme-gold shrink-0 mt-0.5 animate-pulse" />
+          <p className="leading-tight font-semibold text-[10px]">
+            N분의 1 송금 후 정산 완료해 주세요.
           </p>
         </div>
 
         {/* Collapsible Kakao Route Map */}
-        <div className="border border-theme-border rounded-2xl overflow-hidden bg-theme-input transition-colors">
+        <div className="border border-theme-border rounded-lg overflow-hidden bg-theme-input transition-colors">
           <button
             type="button"
             onClick={() => setShowMap(!showMap)}
-            className="w-full px-3 py-2.5 bg-theme-panel hover:bg-theme-panel/75 text-theme-text-secondary text-xs font-bold flex items-center justify-between transition-colors cursor-pointer"
-            style={{ minHeight: '36px' }}
+            className="w-full px-2 py-1.5 bg-theme-panel hover:bg-theme-panel/75 text-theme-text-secondary text-[11px] font-bold flex items-center justify-between transition-colors cursor-pointer"
+            style={{ minHeight: '30px' }}
           >
-            <span className="flex items-center gap-1.5">
+            <span className="flex items-center gap-1">
               <span>🗺️</span>
-              동승 경로 지도 {showMap ? '접기' : '펼치기'}
+              경로 지도 {showMap ? '접기' : '펼치기'}
             </span>
-            <ChevronRight size={14} className={`transform transition-transform ${showMap ? 'rotate-95' : ''}`} />
+            <ChevronRight size={12} className={`transform transition-transform ${showMap ? 'rotate-90' : ''}`} />
           </button>
 
           {showMap && (
-            <div className="p-2 bg-theme-input border-t border-theme-border animate-fade-in transition-colors space-y-2">
+            <div className="p-1 bg-theme-input border-t border-theme-border animate-fade-in transition-colors space-y-1">
               <KakaoMap
                 departure={room.departure}
                 destination={room.destination}
@@ -501,10 +496,10 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
               <button
                 type="button"
                 onClick={openRouteModal}
-                className="w-full py-2 bg-yellow-400 hover:bg-yellow-500 text-yellow-950 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] transition-all cursor-pointer"
-                style={{ minHeight: '36px' }}
+                className="w-full py-1.5 bg-yellow-400 hover:bg-yellow-500 text-yellow-950 text-[11px] font-bold rounded-lg flex items-center justify-center gap-1 shadow-sm active:scale-[0.98] transition-all cursor-pointer"
+                style={{ minHeight: '30px' }}
               >
-                🚕 경로 확인 및 카카오맵 호출하기
+                🚕 경로 확인
               </button>
             </div>
           )}
@@ -809,7 +804,7 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
       {/* 4. Chat Messages Area */}
       <div
         ref={chatContainerRef}
-        className="flex-grow flex flex-col overflow-y-auto px-4 py-3 space-y-3 pb-16 bg-theme-panel/20 transition-colors"
+        className="flex-grow flex flex-col overflow-y-auto px-2.5 py-2 space-y-2 pb-12 bg-theme-panel/20 transition-colors"
       >
         {messages.length === 0 ? (
           <div className="text-center py-10">
@@ -852,22 +847,22 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
       {/* 5. Chat Input Bar */}
       <form
         onSubmit={handleSendMessage}
-        className="sticky bottom-0 bg-theme-header border-t border-theme-header-border p-2.5 flex items-center gap-2 z-10 transition-colors"
+        className="sticky bottom-0 bg-theme-header border-t border-theme-header-border p-1.5 flex items-center gap-1 z-10 transition-colors"
       >
         <input
           type="text"
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
           placeholder="메시지를 입력하세요..."
-          className="flex-1 px-3 py-2 bg-theme-input border border-theme-input-border rounded-xl text-xs focus:outline-none focus:border-theme-input-focus text-theme-text-primary placeholder-theme-text-muted/60 transition-all"
-          style={{ minHeight: '36px' }}
+          className="flex-1 px-2 py-1.5 bg-theme-input border border-theme-input-border rounded-lg text-xs focus:outline-none focus:border-theme-input-focus text-theme-text-primary placeholder-theme-text-muted/60 transition-all"
+          style={{ minHeight: '32px' }}
         />
         <button
           type="submit"
-          className="w-9 h-9 bg-gradient-to-tr from-[#003893] to-blue-500 hover:scale-[1.05] active:scale-[0.9] text-white rounded-xl flex items-center justify-center transition-all shadow-sm cursor-pointer"
-          style={{ minHeight: '36px', minWidth: '36px' }}
+          className="w-8 h-8 bg-gradient-to-tr from-[#003893] to-blue-500 hover:scale-[1.05] active:scale-[0.9] text-white rounded-lg flex items-center justify-center transition-all shadow-sm cursor-pointer"
+          style={{ minHeight: '32px', minWidth: '32px' }}
         >
-          <Send size={16} />
+          <Send size={14} />
         </button>
       </form>
 
