@@ -14,7 +14,7 @@ export const viewport = {
 };
 
 export default function RootLayout({ children }) {
-  const kakaoAppKey = process.env.NEXT_PUBLIC_KAKAO_MAPS_APP_KEY || '';
+  const kakaoAppKey = process.env.NEXT_PUBLIC_KAKAO_MAPS_APP_KEY || '2c63d05e29a82802c023313a723a8c65';
   const loadKakao = kakaoAppKey && kakaoAppKey !== '여기에-카카오-맵-자바스크립트-키' && !kakaoAppKey.includes('여기에');
 
   return (

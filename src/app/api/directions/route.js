@@ -286,6 +286,37 @@ export async function GET(request) {
       }
     }
 
+    // 1.5. OSRM driving directions keyless fallback
+    try {
+      const osrmUrl = `https://router.project-osrm.org/route/v1/driving/${startLng},${startLat};${goalLng},${goalLat}?overview=full&geometries=geojson`;
+      const osrmResponse = await fetch(osrmUrl);
+      if (osrmResponse.ok) {
+        const osrmData = await osrmResponse.json();
+        if (osrmData.routes && osrmData.routes[0]) {
+          const route = osrmData.routes[0];
+          const coordinates = route.geometry.coordinates; // [[lng, lat], [lng, lat], ...]
+          const path = coordinates.map(([lng, lat]) => ({ lat, lng }));
+
+          const distance = route.distance || 5000; // in meters
+          const duration = route.duration || 600; // in seconds
+
+          // Standard Korean Taxi Rate formula
+          const baseFare = 4800;
+          const distanceFare = Math.max(0, distance - 1600) / 131 * 100;
+          const taxiFare = Math.round((baseFare + distanceFare) / 100) * 100;
+
+          return NextResponse.json({
+            path,
+            taxiFare,
+            distance: (distance / 1000).toFixed(1) + 'km',
+            duration: Math.round(duration / 60) + '분'
+          });
+        }
+      }
+    } catch (osrmError) {
+      console.error('OSRM route fetch failed, trying presets:', osrmError);
+    }
+
     // 2. Fallback to predefined road-snapped paths for landmark presets
     const closestStart = findClosestLandmark(startLat, startLng);
     const closestGoal = findClosestLandmark(goalLat, goalLng);

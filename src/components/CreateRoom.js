@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { api } from '@/lib/api';
-import KakaoMap, { getRouteDetails } from '@/components/KakaoMap';
+import KakaoMap, { getRouteDetails, getCoordinates, LANDMARK_COORDS } from '@/components/KakaoMap';
 import { ArrowLeft, MapPin, Clock, Users, ShieldAlert, CreditCard, Link, Landmark } from 'lucide-react';
 
 export default function CreateRoom({ user, onBack, onRoomCreated }) {
@@ -136,6 +136,19 @@ export default function CreateRoom({ user, onBack, onRoomCreated }) {
             <div className="space-y-2 pt-1 animate-fade-in">
               <span className="block text-[10px] font-black text-theme-text-muted ml-1 uppercase tracking-wide transition-colors">경로 지도 프리뷰</span>
               <KakaoMap departure={departure} destination={destination} />
+              <button
+                type="button"
+                onClick={() => {
+                  const depC = getCoordinates(departure, LANDMARK_COORDS.station);
+                  const destC = getCoordinates(destination, LANDMARK_COORDS.main_gate);
+                  const url = `https://map.kakao.com/link/route/${encodeURIComponent(departure)},${depC.lat},${depC.lng},${encodeURIComponent(destination)},${destC.lat},${destC.lng}`;
+                  window.open(url, '_blank');
+                }}
+                className="w-full py-2 bg-yellow-400 hover:bg-yellow-500 text-yellow-950 text-[10px] font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-95"
+                style={{ minHeight: '32px' }}
+              >
+                🚕 카카오 T 앱으로 경로 확인하기
+              </button>
             </div>
           )}
 

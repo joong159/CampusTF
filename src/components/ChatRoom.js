@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { api } from '@/lib/api';
-import KakaoMap from '@/components/KakaoMap';
+import KakaoMap, { getCoordinates, LANDMARK_COORDS } from '@/components/KakaoMap';
 import { 
   ArrowLeft, Send, AlertTriangle, Landmark, 
   ChevronRight, Calculator, Check, Copy, ExternalLink, RefreshCw, UserCheck
@@ -120,6 +120,14 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
     navigator.clipboard.writeText(room.bank_account);
     setCopied(true);
     setTimeout(() => setCopied(false), 2000);
+  };
+
+  const openKakaoTaxiLink = () => {
+    if (!room) return;
+    const depC = getCoordinates(room.departure, LANDMARK_COORDS.station);
+    const destC = getCoordinates(room.destination, LANDMARK_COORDS.main_gate);
+    const url = `https://map.kakao.com/link/route/${encodeURIComponent(room.departure)},${depC.lat},${depC.lng},${encodeURIComponent(room.destination)},${destC.lat},${destC.lng}`;
+    window.open(url, '_blank');
   };
 
   // State Management actions
@@ -272,8 +280,16 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
           </button>
           
           {showMap && (
-            <div className="p-2 bg-theme-input border-t border-theme-border animate-fade-in transition-colors">
+            <div className="p-2 bg-theme-input border-t border-theme-border animate-fade-in transition-colors space-y-2">
               <KakaoMap departure={room.departure} destination={room.destination} />
+              <button
+                type="button"
+                onClick={openKakaoTaxiLink}
+                className="w-full py-2 bg-yellow-400 hover:bg-yellow-500 text-yellow-950 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] transition-all cursor-pointer"
+                style={{ minHeight: '36px' }}
+              >
+                🚕 카카오 T 앱으로 경로 확인 및 호출하기
+              </button>
             </div>
           )}
         </div>
