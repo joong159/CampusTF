@@ -12,6 +12,7 @@ export default function Home({ user, onSelectRoom, onCreateRoomClick, onLogout }
   const [departure, setDeparture] = useState('');
   const [destination, setDestination] = useState('');
   const [loading, setLoading] = useState(true);
+  const [currentTime, setCurrentTime] = useState(Date.now());
 
   // Quick select locations
   const locations = ['대진대 정문', '대진대역 1번출구', '포천터미널', '의정부역'];
@@ -29,6 +30,47 @@ export default function Home({ user, onSelectRoom, onCreateRoomClick, onLogout }
     const interval = setInterval(fetchRooms, 4000);
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    const timer = setInterval(() => {
+      setCurrentTime(Date.now());
+    }, 10000); // update every 10s
+    return () => clearInterval(timer);
+  }, []);
+
+  const renderCountdownBadge = (timeStr, status) => {
+    if (status !== 'recruiting') return null;
+    
+    const diffMs = new Date(timeStr) - currentTime;
+    if (diffMs <= 0) {
+      return (
+        <span className="text-[10px] font-bold text-red-500 bg-red-50 px-2 py-0.5 rounded-md border border-red-100">
+          출발 경과
+        </span>
+      );
+    }
+    
+    const diffMins = Math.floor(diffMs / 1000 / 60);
+    if (diffMins < 1) {
+      return (
+        <span className="text-[10px] font-black text-white bg-red-500 px-2 py-0.5 rounded-md animate-pulse">
+          ⏳ 곧 출발!
+        </span>
+      );
+    }
+    if (diffMins < 10) {
+      return (
+        <span className="text-[10px] font-bold text-amber-600 bg-amber-50 px-2 py-0.5 rounded-md animate-pulse border border-amber-200">
+          ⏳ {diffMins}분 남음!
+        </span>
+      );
+    }
+    return (
+      <span className="text-[10px] font-bold text-[#003893] bg-[#EBF2FF] px-2 py-0.5 rounded-md">
+        {diffMins}분 남음
+      </span>
+    );
+  };
 
   const handleApply = async (roomId, e) => {
     e.stopPropagation();
@@ -325,6 +367,8 @@ export default function Home({ user, onSelectRoom, onCreateRoomClick, onLogout }
                         }`}>
                           {room.gender_filter === 'same_gender' ? `동성만 (${room.host.gender})` : '성별 무관'}
                         </span>
+
+                        {renderCountdownBadge(room.departure_time, room.status)}
                       </div>
                       
                       {/* Host Student ID indicator */}

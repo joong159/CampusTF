@@ -2,12 +2,12 @@
 
 import { useState } from 'react';
 import { api } from '@/lib/api';
-import NaverMap from '@/components/NaverMap';
-import { ArrowLeft, MapPin, Clock, Users, ShieldAlert, CreditCard, Link } from 'lucide-react';
+import NaverMap, { getRouteDetails } from '@/components/NaverMap';
+import { ArrowLeft, MapPin, Clock, Users, ShieldAlert, CreditCard, Link, Landmark } from 'lucide-react';
 
 export default function CreateRoom({ user, onBack, onRoomCreated }) {
-  const [departure, setDeparture] = useState('');
-  const [destination, setDestination] = useState('');
+  const [departure, setDeparture] = useState('대진대역 1번출구');
+  const [destination, setDestination] = useState('대진대 정문');
   const [departureTime, setDepartureTime] = useState('');
   const [capacity, setCapacity] = useState(4);
   const [genderFilter, setGenderFilter] = useState('anyone');
@@ -18,13 +18,23 @@ export default function CreateRoom({ user, onBack, onRoomCreated }) {
 
   const bankOptions = ['국민은행', '신한은행', '우리은행', '하나은행', '카카오뱅크', '토스뱅크', '농협'];
 
-  // Presets
-  const locations = ['대진대 정문', '대진대역 1번출구', '포천터미널', '의정부역'];
+  // Preset location dropdown options
+  const locations = [
+    '대진대역 1번출구',
+    '대진대 정문',
+    '대진대 공학관',
+    '포천터미널',
+    '의정부역'
+  ];
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!departure || !destination) {
       alert('출발지와 목적지를 입력해주세요.');
+      return;
+    }
+    if (departure === destination) {
+      alert('출발지와 목적지가 동일합니다. 다르게 지정해 주세요.');
       return;
     }
     if (!departureTime) {
@@ -85,32 +95,19 @@ export default function CreateRoom({ user, onBack, onRoomCreated }) {
           <div>
             <label className="block text-xs font-bold text-gray-700 mb-1.5 ml-1">출발지</label>
             <div className="relative">
-              <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-gray-400">
+              <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-gray-400 pointer-events-none z-10">
                 <MapPin size={18} className="text-blue-500" />
               </span>
-              <input
-                type="text"
+              <select
                 value={departure}
                 onChange={(e) => setDeparture(e.target.value)}
-                placeholder="예: 대진대역 1번출구"
-                className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#003893] focus:bg-white text-gray-800"
+                className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#003893] focus:bg-white text-gray-800 appearance-none"
                 style={{ minHeight: '48px' }}
-                required
-              />
-            </div>
-            {/* Presets */}
-            <div className="flex gap-1.5 mt-2 flex-wrap">
-              {locations.map(loc => (
-                <button
-                  type="button"
-                  key={loc}
-                  onClick={() => setDeparture(loc)}
-                  className="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-semibold rounded-lg"
-                  style={{ minHeight: '32px' }}
-                >
-                  {loc}
-                </button>
-              ))}
+              >
+                {locations.map(loc => (
+                  <option key={loc} value={loc}>{loc}</option>
+                ))}
+              </select>
             </div>
           </div>
 
@@ -118,32 +115,19 @@ export default function CreateRoom({ user, onBack, onRoomCreated }) {
           <div>
             <label className="block text-xs font-bold text-gray-700 mb-1.5 ml-1">목적지</label>
             <div className="relative">
-              <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-gray-400">
+              <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-gray-400 pointer-events-none z-10">
                 <MapPin size={18} className="text-red-500" />
               </span>
-              <input
-                type="text"
+              <select
                 value={destination}
                 onChange={(e) => setDestination(e.target.value)}
-                placeholder="예: 대진대 정문 / 공학관"
-                className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#003893] focus:bg-white text-gray-800"
+                className="w-full pl-10 pr-4 py-3 bg-gray-50 border border-gray-200 rounded-xl text-sm focus:outline-none focus:border-[#003893] focus:bg-white text-gray-800 appearance-none"
                 style={{ minHeight: '48px' }}
-                required
-              />
-            </div>
-            {/* Presets */}
-            <div className="flex gap-1.5 mt-2 flex-wrap">
-              {locations.map(loc => (
-                <button
-                  type="button"
-                  key={loc}
-                  onClick={() => setDestination(loc)}
-                  className="px-2.5 py-1.5 bg-gray-100 hover:bg-gray-200 text-gray-600 text-xs font-semibold rounded-lg"
-                  style={{ minHeight: '32px' }}
-                >
-                  {loc}
-                </button>
-              ))}
+              >
+                {locations.map(loc => (
+                  <option key={loc} value={loc}>{loc}</option>
+                ))}
+              </select>
             </div>
           </div>
 
@@ -152,6 +136,28 @@ export default function CreateRoom({ user, onBack, onRoomCreated }) {
             <div className="space-y-1.5 pt-1 animate-fade-in">
               <span className="block text-xs font-bold text-gray-700 ml-1">경로 지도 프리뷰</span>
               <NaverMap departure={departure} destination={destination} />
+            </div>
+          )}
+
+          {/* Pre-ride Taxi Fare & N/1 Cost Estimator Banner */}
+          {departure && destination && departure !== destination && (
+            <div className="bg-blue-50 border border-blue-150 rounded-2xl p-4 space-y-2.5 animate-fade-in shadow-sm">
+              <div className="flex items-center gap-1.5 text-xs font-black text-[#003893] uppercase tracking-wider">
+                <Landmark size={14} />
+                예상 요금 및 1/N 예상액
+              </div>
+              
+              <div className="flex justify-between text-xs text-gray-600">
+                <span>이동 거리: <strong>{getRouteDetails(departure, destination).distance}</strong></span>
+                <span>예상 총 택시비: <strong className="text-gray-800 font-bold">{getRouteDetails(departure, destination).fare.toLocaleString()}원</strong></span>
+              </div>
+              
+              <div className="flex justify-between items-center pt-2 text-xs border-t border-blue-200/50">
+                <span className="font-semibold text-gray-700">1인당 분담금 ({capacity}명 모집 시):</span>
+                <span className="text-base font-black text-red-500">
+                  {Math.round(getRouteDetails(departure, destination).fare / capacity).toLocaleString()}원
+                </span>
+              </div>
             </div>
           )}
         </div>
