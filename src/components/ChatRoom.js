@@ -90,6 +90,7 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
   const [guestIsMidway, setGuestIsMidway] = useState(false);
   const [applyingMidway, setApplyingMidway] = useState(false); // midway toggle on application banner
   const [midwayLocationInput, setMidwayLocationInput] = useState('대진대 정문'); // 중간 지점 입력
+  const [midwayLocationCoords, setMidwayLocationCoords] = useState(LANDMARK_COORDS.main_gate); // 중간 지점 좌표
   const [midwayLocationSuggestions, setMidwayLocationSuggestions] = useState([]); // 중간 지점 검색 결과
   const [showMidwaySuggestions, setShowMidwaySuggestions] = useState(false); // 드롭다운 표시 여부
   const midwayDebounceRef = useRef(null); // 디바운스 처리
@@ -271,6 +272,7 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
   // 중간 지점 제안된 위치 선택
   const selectMidwayLocation = (item) => {
     setMidwayLocationInput(item.name);
+    setMidwayLocationCoords({ lat: item.lat, lng: item.lng }); // 좌표 저장
     setMidwayLocationSuggestions([]);
     setShowMidwaySuggestions(false);
   };
@@ -596,7 +598,7 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
 
                 {/* Midway fare preview */}
                 {applyingMidway && room && (() => {
-                  const midC = LANDMARK_COORDS.main_gate;
+                  const midC = midwayLocationCoords; // 사용자가 선택한 중간 지점 좌표
                   const destC = getCoordinates(room.destination, LANDMARK_COORDS.main_gate);
                   const distM = calculateDistance(midC.lat, midC.lng, destC.lat, destC.lng);
                   const estimatedFare = calcTaxiFare(distM);
@@ -606,7 +608,7 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
                     <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-3 text-[11px] space-y-1 animate-fade-in">
                       <p className="font-black text-amber-600">📊 중간 합류 예상 분담금 미리보기</p>
                       <div className="flex justify-between text-theme-text-secondary">
-                        <span>정문 → {getDisplayLocation(room.destination)} 예상 요금</span>
+                        <span>{midwayLocationInput} → {getDisplayLocation(room.destination)} 예상 요금</span>
                         <span className="font-bold text-theme-text-primary">약 {estimatedFare.toLocaleString()}원</span>
                       </div>
                       <div className="flex justify-between text-theme-text-secondary border-t border-amber-500/20 pt-1">
