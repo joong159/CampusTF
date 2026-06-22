@@ -90,6 +90,9 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
   const [guestIsMidway, setGuestIsMidway] = useState(false);
   const [applyingMidway, setApplyingMidway] = useState(false); // midway toggle on application banner
   const [midwayLocationInput, setMidwayLocationInput] = useState('대진대 정문'); // 중간 지점 입력
+  const [midwayLocationSuggestions, setMidwayLocationSuggestions] = useState([]); // 중간 지점 검색 결과
+  const [showMidwaySuggestions, setShowMidwaySuggestions] = useState(false); // 드롭다운 표시 여부
+  const midwayDebounceRef = useRef(null); // 디바운스 처리
 
   // Route modal state
   const [showRouteModal, setShowRouteModal] = useState(false);
@@ -250,9 +253,26 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
         })));
       } else {
         setResults([]);
-        alert('검색 결과가 없습니다. 다른 검색어를 입력해보세요.');
       }
     });
+  };
+
+  // 중간 지점 검색 입력 핸들러
+  const handleMidwayLocationInput = (e) => {
+    const val = e.target.value;
+    setMidwayLocationInput(val);
+    setShowMidwaySuggestions(true);
+    clearTimeout(midwayDebounceRef.current);
+    midwayDebounceRef.current = setTimeout(() => {
+      searchKakaoPlaces(val, setMidwayLocationSuggestions);
+    }, 250);
+  };
+
+  // 중간 지점 제안된 위치 선택
+  const selectMidwayLocation = (item) => {
+    setMidwayLocationInput(item.name);
+    setMidwayLocationSuggestions([]);
+    setShowMidwaySuggestions(false);
   };
 
   // 카카오맵 공식 URL 포맷으로 경로 열기
@@ -431,12 +451,15 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
       <div className="bg-theme-panel border-b border-theme-border p-3 text-xs space-y-2.5 z-5 transition-colors">
         {/* Taxi Fare Banner - Show to all users when room has total_fare */}
         {room && room.total_fare > 0 && (
-          <div className="bg-green-500/10 border border-green-500/30 text-green-700 rounded-2xl p-3 flex items-start gap-2 transition-colors">
-            <CreditCard size={15} className="text-green-600 shrink-0 mt-0.5" />
-            <div className="leading-normal font-semibold">
-              <p className="font-black text-green-700">💰 방장이 설정한 택시 요금</p>
-              <p className="text-sm font-bold text-green-600 mt-1">{room.total_fare.toLocaleString()}원</p>
-              <p className="text-[10px] text-green-600/80 mt-0.5">현재 인원({participantsCount}명) 기준 분담금: 약 {Math.round(room.total_fare / participantsCount / 10) * 10}원</p>
+          <div className="bg-gradient-to-r from-green-500/20 to-emerald-500/20 border-2 border-green-500/50 text-green-700 rounded-2xl p-3.5 flex items-start gap-3 transition-colors shadow-lg shadow-green-500/10">
+            <CreditCard size={18} className="text-green-600 shrink-0 mt-0.5 animate-bounce" />
+            <div className="leading-normal flex-1">
+              <p className="font-black text-green-700 text-sm">💰 방장이 설정한 택시 총 요금</p>
+              <p className="text-lg font-black text-green-600 mt-2 mb-2">{room.total_fare.toLocaleString()}원</p>
+              <div className="bg-white/20 rounded-xl p-2 backdrop-blur-sm">
+                <p className="text-xs font-bold text-green-700">📊 인원 분담금 (현재 {participantsCount}명)</p>
+                <p className="text-sm font-black text-green-600 mt-1">1인당 약 {Math.round(room.total_fare / participantsCount / 10) * 10}원</p>
+              </div>
             </div>
           </div>
         )}
@@ -528,14 +551,46 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
                     <label className="block text-xs font-bold text-theme-text-secondary mb-1.5 ml-1">
                       📍 중간 지점 (탑승 위치)
                     </label>
-                    <input
-                      type="text"
-                      value={midwayLocationInput}
-                      onChange={(e) => setMidwayLocationInput(e.target.value)}
-                      placeholder="예: 대진대 정문, 포천역, 의정부역..."
-                      className="w-full px-3 py-2.5 bg-theme-input border border-theme-input-border rounded-2xl text-xs focus:outline-none focus:border-theme-input-focus focus:bg-theme-input focus:shadow-glow-blue text-theme-text-primary placeholder-theme-text-muted/65 transition-all"
-                    />
-                    <p className="text-[10px] text-theme-text-muted mt-1 ml-1">위에서 탑승할 구체적인 위치를 입력하세요</p>
+                    <div className="relative">
+                      <input
+                        type="text"
+                        value={midwayLocationInput}
+                        onChange={handleMidwayLocationInput}
+                        onFocus={() => {
+                          setShowMidwaySuggestions(true);
+                          searchKakaoPlaces(midwayLocationInput, setMidwayLocationSuggestions);
+                        }}
+                        onBlur={() => setTimeout(() => setShowMidwaySuggestions(false), 180)}
+                        placeholder="예: 대진대 정문, 포천역, 의정부역..."
+                        className="w-full px-3 py-2.5 bg-theme-input border border-theme-input-border rounded-2xl text-xs focus:outline-none focus:border-theme-input-focus focus:bg-theme-input focus:shadow-glow-blue text-theme-text-primary placeholder-theme-text-muted/65 transition-all"
+                        autoComplete="off"
+                      />
+                      
+                      {/* Midway location suggestions dropdown */}
+                      {showMidwaySuggestions && midwayLocationSuggestions.length > 0 && (
+                        <div className="absolute top-full left-0 right-0 mt-1 bg-theme-panel border border-theme-border rounded-2xl shadow-xl z-50 overflow-hidden animate-fade-in max-h-48 overflow-y-auto">
+                          {midwayLocationSuggestions.map((item, i) => (
+                            <button
+                              key={i}
+                              type="button"
+                              onMouseDown={() => selectMidwayLocation(item)}
+                              className="w-full text-left px-4 py-2.5 hover:bg-theme-input transition-colors border-b border-theme-border/50 last:border-none cursor-pointer"
+                            >
+                              <div className="flex items-start gap-2">
+                                <span className="text-amber-500 shrink-0 mt-0.5">📍</span>
+                                <div className="min-w-0">
+                                  <p className="text-xs font-bold text-theme-text-primary truncate">{item.name}</p>
+                                  {item.address && (
+                                    <p className="text-[10px] text-theme-text-muted mt-0.5 truncate">{item.address}</p>
+                                  )}
+                                </div>
+                              </div>
+                            </button>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                    <p className="text-[10px] text-theme-text-muted mt-1 ml-1">🔍 카카오맵에서 검색된 위치를 선택하거나 직접 입력하세요</p>
                   </div>
                 )}
 
