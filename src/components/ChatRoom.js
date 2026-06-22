@@ -20,7 +20,7 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
   const [showMap, setShowMap] = useState(true); // Default map expanded
   const [myStatus, setMyStatus] = useState('none'); // 'none', 'pending', 'accepted', 'rejected'
   
-  const messagesEndRef = useRef(null);
+  const chatContainerRef = useRef(null);
 
   const fetchRoomData = useCallback(async () => {
     try {
@@ -77,7 +77,9 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
 
   // Scroll to bottom when messages load/change
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (chatContainerRef.current) {
+      chatContainerRef.current.scrollTop = chatContainerRef.current.scrollHeight;
+    }
   }, [messages]);
 
   const handleSendMessage = async (e) => {
@@ -398,7 +400,10 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
       </div>
 
       {/* 4. Chat Messages Area */}
-      <div className="flex-grow flex flex-col overflow-y-auto px-4 py-4 space-y-4 pb-20 bg-theme-panel/20 transition-colors">
+      <div 
+        ref={chatContainerRef}
+        className="flex-grow flex flex-col overflow-y-auto px-4 py-4 space-y-4 pb-20 bg-theme-panel/20 transition-colors"
+      >
         {messages.length === 0 ? (
           <div className="text-center py-10">
             <p className="text-xs text-theme-text-muted font-bold transition-colors">동승자들과 대화를 시작해 보세요!</p>
@@ -436,10 +441,8 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
             );
           })
         )}
-        <div ref={messagesEndRef} />
       </div>
 
-      {/* 5. Chat Input Bar */}
       {/* 5. Chat Input Bar */}
       <form
         onSubmit={handleSendMessage}
