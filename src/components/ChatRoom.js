@@ -84,6 +84,7 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
   const [showMap, setShowMap] = useState(true); // Default map expanded
+  const [showSettlement, setShowSettlement] = useState(false); // 정산 정보 접기/펼치기
   const [myStatus, setMyStatus] = useState('none'); // 'none', 'pending', 'accepted', 'rejected'
   const [acceptedApplicants, setAcceptedApplicants] = useState([]);
   const [midwayBoarders, setMidwayBoarders] = useState({}); // userId -> boolean
@@ -664,46 +665,57 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
           </div>
         )}
 
-        {/* Settlement Info / Account Guide Banner (LOCKED for non-accepted guests) */}
-        <div className="border border-theme-border rounded-2xl p-3.5 bg-theme-panel flex flex-col gap-2.5 transition-colors">
-          <div className="flex items-center justify-between">
+        {/* Settlement Info / Account Guide Banner (COLLAPSIBLE) */}
+        <div className="border border-theme-border rounded-2xl bg-theme-panel transition-colors">
+          <button
+            type="button"
+            onClick={() => setShowSettlement(!showSettlement)}
+            className="w-full p-3.5 flex items-center justify-between hover:bg-theme-input transition-colors cursor-pointer"
+          >
             <span className="font-bold text-theme-text-primary flex items-center gap-1.5 transition-colors">
               <Landmark size={14} className="text-theme-blue" />
               정산 계좌 정보
             </span>
-            <span className="text-[9px] text-theme-text-muted font-bold transition-colors">방장 학번: {room.host.student_id}</span>
-          </div>
+            <div className="flex items-center gap-2">
+              <span className="text-[9px] text-theme-text-muted font-bold transition-colors">방장 학번: {room.host.student_id}</span>
+              <ChevronRight size={14} className={`text-theme-text-muted transition-transform ${showSettlement ? 'rotate-90' : ''}`} />
+            </div>
+          </button>
 
-          {isHost || myStatus === 'accepted' ? (
-            <>
-              <div className="flex items-center justify-between bg-theme-input border border-theme-input-border rounded-xl p-2.5 transition-colors">
-                <span className="font-extrabold text-theme-text-primary text-xs tracking-wide transition-colors">{room.bank_account}</span>
-                <button
-                  onClick={handleCopyAccount}
-                  className="text-theme-blue text-xs font-bold flex items-center gap-0.5 hover:underline cursor-pointer"
-                  style={{ minHeight: '28px' }}
-                >
-                  {copied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
-                  {copied ? '복사됨' : '복사'}
-                </button>
-              </div>
+          {showSettlement && (
+            <div className="border-t border-theme-border p-3.5 flex flex-col gap-2.5 animate-fade-in">
+              {isHost || myStatus === 'accepted' ? (
+                <>
+                  <div className="flex items-center justify-between bg-theme-input border border-theme-input-border rounded-xl p-2.5 transition-colors">
+                    <span className="font-extrabold text-theme-text-primary text-xs tracking-wide transition-colors">{room.bank_account}</span>
+                    <button
+                      onClick={handleCopyAccount}
+                      className="text-theme-blue text-xs font-bold flex items-center gap-0.5 hover:underline cursor-pointer"
+                      style={{ minHeight: '28px' }}
+                    >
+                      {copied ? <Check size={14} className="text-emerald-500" /> : <Copy size={14} />}
+                      {copied ? '복사됨' : '복사'}
+                    </button>
+                  </div>
 
-              {room.kakaopay_url && (
-                <a
-                  href={room.kakaopay_url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="w-full py-2 bg-yellow-400 hover:bg-yellow-500 text-yellow-955 text-xs font-bold rounded-xl flex items-center justify-center gap-1 transition-colors shadow-sm"
-                  style={{ minHeight: '36px' }}
-                >
-                  <ExternalLink size={13} />
-                  카카오페이 빠른 송금
-                </a>
+                  {room.kakaopay_url && (
+                    <a
+                      href={room.kakaopay_url}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="w-full py-2 bg-yellow-400 hover:bg-yellow-500 text-yellow-955 text-xs font-bold rounded-xl flex items-center justify-center gap-1 transition-colors shadow-sm"
+                      style={{ minHeight: '36px' }}
+                    >
+                      <ExternalLink size={13} />
+                      카카오페이 빠른 송금
+                    </a>
+                  )}
+                </>
+              ) : (
+                <div className="bg-theme-input border border-dashed border-theme-border rounded-xl p-3.5 text-center text-theme-text-muted text-xs flex items-center justify-center gap-1.5 font-medium transition-colors">
+                  <span>🔒 계좌 정보는 방장이 신청을 수락하면 공개됩니다.</span>
+                </div>
               )}
-            </>
-          ) : (
-            <div className="bg-theme-input border border-dashed border-theme-border rounded-xl p-3.5 text-center text-theme-text-muted text-xs flex items-center justify-center gap-1.5 font-medium transition-colors">
-              <span>🔒 계좌 정보는 방장이 신청을 수락하면 공개됩니다.</span>
             </div>
           )}
         </div>
@@ -797,7 +809,7 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
       {/* 4. Chat Messages Area */}
       <div
         ref={chatContainerRef}
-        className="flex-grow flex flex-col overflow-y-auto px-4 py-4 space-y-4 pb-20 bg-theme-panel/20 transition-colors"
+        className="flex-grow flex flex-col overflow-y-auto px-4 py-3 space-y-3 pb-16 bg-theme-panel/20 transition-colors"
       >
         {messages.length === 0 ? (
           <div className="text-center py-10">
@@ -840,22 +852,22 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
       {/* 5. Chat Input Bar */}
       <form
         onSubmit={handleSendMessage}
-        className="sticky bottom-0 bg-theme-header border-t border-theme-header-border p-3 flex items-center gap-2.5 z-10 transition-colors"
+        className="sticky bottom-0 bg-theme-header border-t border-theme-header-border p-2.5 flex items-center gap-2 z-10 transition-colors"
       >
         <input
           type="text"
           value={inputValue}
           onChange={(e) => setInputValue(e.target.value)}
           placeholder="메시지를 입력하세요..."
-          className="flex-1 px-4 py-3 bg-theme-input border border-theme-input-border rounded-2xl text-xs focus:outline-none focus:border-theme-input-focus text-theme-text-primary placeholder-theme-text-muted/60 transition-all"
-          style={{ minHeight: '44px' }}
+          className="flex-1 px-3 py-2 bg-theme-input border border-theme-input-border rounded-xl text-xs focus:outline-none focus:border-theme-input-focus text-theme-text-primary placeholder-theme-text-muted/60 transition-all"
+          style={{ minHeight: '36px' }}
         />
         <button
           type="submit"
-          className="w-11 h-11 bg-gradient-to-tr from-[#003893] to-blue-500 hover:scale-[1.05] active:scale-[0.9] text-white rounded-2xl flex items-center justify-center transition-all shadow-sm cursor-pointer"
-          style={{ minHeight: '40px', minWidth: '40px' }}
+          className="w-9 h-9 bg-gradient-to-tr from-[#003893] to-blue-500 hover:scale-[1.05] active:scale-[0.9] text-white rounded-xl flex items-center justify-center transition-all shadow-sm cursor-pointer"
+          style={{ minHeight: '36px', minWidth: '36px' }}
         >
-          <Send size={18} />
+          <Send size={16} />
         </button>
       </form>
 
