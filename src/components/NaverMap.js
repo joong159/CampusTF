@@ -1,7 +1,6 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import Script from 'next/script';
 import { MapPin, Navigation, Compass, AlertCircle, Play, Square } from 'lucide-react';
 
 const naverClientId = process.env.NEXT_PUBLIC_NAVER_MAPS_CLIENT_ID;
@@ -76,8 +75,28 @@ export default function NaverMap({ departure, destination }) {
   const destCoords = getCoordinates(destination, LANDMARK_COORDS.main_gate);
 
   useEffect(() => {
-    if (typeof window !== 'undefined' && window.naver && window.naver.maps) {
-      setScriptLoaded(true);
+    if (typeof window !== 'undefined') {
+      if (window.naver && window.naver.maps) {
+        setScriptLoaded(true);
+      } else {
+        // Poll until global Naver Map script loads in layout
+        const interval = setInterval(() => {
+          if (window.naver && window.naver.maps) {
+            setScriptLoaded(true);
+            clearInterval(interval);
+          }
+        }, 150);
+        
+        const timeout = setTimeout(() => {
+          clearInterval(interval);
+        }, 10000); // 10s timeout limit
+        
+        return () => {
+          clearInterval(interval);
+          clearTimeout(timeout);
+          stopSimulation();
+        };
+      }
     }
     return () => stopSimulation();
   }, []);
@@ -265,10 +284,6 @@ export default function NaverMap({ departure, destination }) {
     }
   }, [scriptLoaded, departure, destination, depCoords.lat, depCoords.lng, destCoords.lat, destCoords.lng]);
 
-  const handleScriptLoad = () => {
-    setScriptLoaded(true);
-  };
-
   // Render Mock fallback if Naver is not configured
   if (!isNaverConfigured || mapError) {
     // Interpolate coords for Mock SVG Animation
@@ -345,18 +360,12 @@ export default function NaverMap({ departure, destination }) {
   }
 
   return (
-    <div className="w-full h-44 rounded-xl overflow-hidden border border-gray-150 relative shadow-sm">
-      <Script
-        src={`https://oapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${naverClientId}`}
-        onLoad={handleScriptLoad}
-        strategy="afterInteractive"
-      />
-      
+    <div className="w-full h-44 rounded-xl overflow-hidden border border-theme-border relative shadow-sm">
       <div ref={mapContainerRef} className="w-full h-full bg-gray-50" />
       
       {!scriptLoaded && (
-        <div className="absolute inset-0 bg-gray-150/40 backdrop-blur-sm flex items-center justify-center">
-          <span className="w-5 h-5 border-2 border-[#003893] border-t-transparent rounded-full animate-spin"></span>
+        <div className="absolute inset-0 bg-slate-500/10 backdrop-blur-sm flex items-center justify-center">
+          <span className="w-5 h-5 border-2 border-theme-blue border-t-transparent rounded-full animate-spin"></span>
         </div>
       )}
 
@@ -365,10 +374,10 @@ export default function NaverMap({ departure, destination }) {
         <button
           type="button"
           onClick={isSimulating ? stopSimulation : startSimulation}
-          className="absolute left-3 bottom-3 bg-white hover:bg-gray-50 text-gray-700 text-[10px] font-bold py-1.5 px-2.5 rounded-lg flex items-center gap-1 shadow-md z-30 transition-colors border border-gray-200"
+          className="absolute left-3 bottom-3 bg-theme-panel hover:bg-theme-panel/85 text-theme-text-secondary text-[10px] font-bold py-1.5 px-2.5 rounded-lg flex items-center gap-1 shadow-sm z-30 transition-colors border border-theme-border cursor-pointer"
           style={{ minHeight: '32px' }}
         >
-          {isSimulating ? <Square size={10} className="text-red-500" fill="currentColor" /> : <Play size={10} className="text-green-600" fill="currentColor" />}
+          {isSimulating ? <Square size={10} className="text-red-500" fill="currentColor" /> : <Play size={10} className="text-emerald-500" fill="currentColor" />}
           {isSimulating ? '정지' : '🚗 위치 시뮬레이션'}
         </button>
       )}

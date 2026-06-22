@@ -59,19 +59,19 @@ export default function ApplicantManagement({ user, roomId, onBack, onEnterChat 
 
   if (loading && !room) {
     return (
-      <div className="flex flex-col flex-1 items-center justify-center bg-white py-20">
-        <span className="w-8 h-8 border-4 border-[#003893] border-t-transparent rounded-full animate-spin mb-2"></span>
-        <span className="text-xs text-gray-400 font-semibold">신청자 목록 로딩 중...</span>
+      <div className="flex flex-col flex-1 items-center justify-center bg-theme-emulator py-20 transition-colors">
+        <span className="w-8 h-8 border-2 border-theme-blue border-t-transparent rounded-full animate-spin mb-3"></span>
+        <span className="text-xs text-theme-text-muted font-bold transition-colors">신청자 목록 로딩 중...</span>
       </div>
     );
   }
 
   if (!room) {
     return (
-      <div className="flex flex-col flex-1 items-center justify-center p-6 bg-white text-center">
-        <ShieldAlert size={40} className="text-red-500 mb-2" />
-        <p className="text-sm font-bold text-gray-700">방 정보를 찾을 수 없습니다.</p>
-        <button onClick={onBack} className="mt-4 px-4 py-2 bg-gray-100 rounded-xl text-xs font-bold text-gray-600">
+      <div className="flex flex-col flex-1 items-center justify-center p-6 bg-theme-emulator text-center transition-colors">
+        <ShieldAlert size={36} className="text-red-500 mb-2" />
+        <p className="text-sm font-bold text-theme-text-secondary transition-colors">방 정보를 찾을 수 없습니다.</p>
+        <button onClick={onBack} className="mt-4 px-4 py-2 bg-theme-panel border border-theme-border rounded-xl text-xs font-bold text-theme-text-secondary cursor-pointer">
           홈으로 가기
         </button>
       </div>
@@ -83,25 +83,25 @@ export default function ApplicantManagement({ user, roomId, onBack, onEnterChat 
   const otherApps = applicants.filter(a => a.status !== 'pending');
 
   return (
-    <div className="flex flex-col flex-1 bg-gray-50 pb-20">
+    <div className="flex flex-col flex-1 bg-theme-emulator text-theme-text-primary transition-colors duration-300 pb-20">
       {/* Header */}
-      <header className="sticky top-0 bg-white border-b border-gray-100 px-4 py-3 flex items-center justify-between z-10">
+      <header className="sticky top-0 bg-theme-header backdrop-blur-md border-b border-theme-header-border px-4 py-3 flex items-center justify-between z-10 shadow-sm transition-colors">
         <div className="flex items-center gap-3">
           <button
             onClick={onBack}
-            className="w-10 h-10 hover:bg-gray-50 rounded-full flex items-center justify-center text-gray-700 transition-colors"
-            style={{ minHeight: '48px', minWidth: '48px' }}
+            className="w-9 h-9 bg-theme-panel border border-theme-border hover:bg-theme-panel/70 rounded-full flex items-center justify-center text-theme-text-secondary hover:text-theme-text-primary transition-colors cursor-pointer"
+            style={{ minHeight: '36px', minWidth: '36px' }}
           >
-            <ArrowLeft size={20} />
+            <ArrowLeft size={18} />
           </button>
-          <h1 className="text-base font-bold text-gray-800">신청자 관리</h1>
+          <h1 className="text-sm font-black text-theme-text-primary transition-colors">신청자 관리</h1>
         </div>
         
         {/* Go to Chat */}
         <button
           onClick={onEnterChat}
-          className="px-3.5 py-1.5 bg-[#003893] hover:bg-[#002a70] text-white text-xs font-bold rounded-lg flex items-center gap-1 transition-colors"
-          style={{ minHeight: '36px' }}
+          className="px-3.5 py-1.5 bg-gradient-to-r from-[#003893] to-blue-600 hover:from-theme-blue hover:to-blue-500 text-white text-[10px] font-black rounded-xl flex items-center gap-1 transition-all shadow-sm cursor-pointer"
+          style={{ minHeight: '34px' }}
         >
           <MessageCircle size={14} />
           채팅방
@@ -109,43 +109,43 @@ export default function ApplicantManagement({ user, roomId, onBack, onEnterChat 
       </header>
 
       {/* Room Brief Info */}
-      <div className="bg-white p-4 border-b border-gray-100 shadow-sm">
-        <span className="text-[10px] font-bold text-gray-400 tracking-wider uppercase block mb-1">내 모집 방 정보</span>
-        <div className="flex items-center gap-2 mb-2">
-          <span className="text-sm font-bold text-gray-800">{room.departure}</span>
-          <span className="text-xs text-gray-400">➔</span>
-          <span className="text-sm font-bold text-gray-800">{room.destination}</span>
+      <div className="bg-theme-panel p-4 border-b border-theme-border shadow-sm transition-colors duration-300">
+        <span className="text-[10px] font-bold text-theme-text-muted tracking-wider uppercase block mb-1.5 transition-colors">내 모집 방 정보</span>
+        <div className="flex items-center gap-2 mb-2 font-bold">
+          <span className="text-xs font-black text-theme-text-primary truncate max-w-[150px] transition-colors">{room.departure}</span>
+          <span className="text-[10px] text-theme-text-muted">➔</span>
+          <span className="text-xs font-black text-theme-text-primary truncate max-w-[150px] transition-colors">{room.destination}</span>
         </div>
-        <div className="flex justify-between items-center text-xs text-gray-500 pt-1">
+        <div className="flex justify-between items-center text-xs text-theme-text-secondary pt-1 transition-colors">
           <span>출발 시간: <strong>{new Date(room.departure_time).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })}</strong></span>
-          <span className="font-bold text-gray-700">참여: {acceptedCount} / {room.capacity}명</span>
+          <span className="font-bold">참여: <strong className="text-theme-blue">{acceptedCount} / {room.capacity}명</strong></span>
         </div>
       </div>
 
       {/* Main List */}
-      <div className="p-4 space-y-5">
+      <div className="p-4 space-y-5 bg-theme-emulator transition-colors">
         {/* 1. Pending Applicants */}
         <div className="space-y-2">
-          <h3 className="text-xs font-black text-gray-400 tracking-wider uppercase">⏳ 대기 중인 신청 ({pendingApps.length})</h3>
+          <h3 className="text-[10px] font-black text-theme-text-muted tracking-wider uppercase ml-1 transition-colors">⏳ 대기 중인 신청 ({pendingApps.length})</h3>
           
           {pendingApps.length === 0 ? (
-            <div className="bg-white rounded-2xl p-6 text-center border border-gray-100">
-              <p className="text-xs text-gray-400 font-semibold">새로운 신청자가 없습니다.</p>
+            <div className="bg-theme-panel rounded-2xl p-6 text-center border border-theme-border transition-colors">
+              <p className="text-xs text-theme-text-muted font-bold transition-colors">새로운 신청자가 없습니다.</p>
             </div>
           ) : (
             <div className="space-y-3">
               {pendingApps.map((app) => (
                 <div
                   key={app.id}
-                  className="bg-white rounded-2xl p-4 border border-gray-100 shadow-sm flex items-center justify-between"
+                  className="bg-theme-panel rounded-2xl p-4 border border-theme-border shadow-sm flex items-center justify-between transition-colors"
                 >
                   <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-[#EBF2FF] text-[#003893] rounded-full flex items-center justify-center font-bold">
-                      <User size={18} />
+                    <div className="w-10 h-10 bg-theme-blue-light text-theme-blue rounded-full flex items-center justify-center font-bold transition-colors">
+                      <User size={16} />
                     </div>
                     <div>
-                      <span className="text-sm font-bold text-gray-800 block">학번: {app.user.student_id}</span>
-                      <span className="text-xs text-gray-400 font-semibold">성별: {app.user.gender}학생</span>
+                      <span className="text-sm font-bold text-theme-text-primary block transition-colors">학번: {app.user.student_id}</span>
+                      <span className="text-xs text-theme-text-secondary font-semibold transition-colors">성별: {app.user.gender}학생</span>
                     </div>
                   </div>
 
@@ -153,19 +153,19 @@ export default function ApplicantManagement({ user, roomId, onBack, onEnterChat 
                   <div className="flex gap-2">
                     <button
                       onClick={() => handleStatusUpdate(app.id, 'rejected')}
-                      className="w-10 h-10 bg-red-50 hover:bg-red-100 text-red-600 rounded-xl flex items-center justify-center transition-colors"
-                      style={{ minHeight: '40px', minWidth: '40px' }}
+                      className="w-9 h-9 bg-red-500/10 border border-red-500/15 hover:bg-red-500/20 text-red-500 rounded-xl flex items-center justify-center transition-colors cursor-pointer"
+                      style={{ minHeight: '36px', minWidth: '36px' }}
                       title="거절"
                     >
-                      <X size={18} />
+                      <X size={16} />
                     </button>
                     <button
                       onClick={() => handleStatusUpdate(app.id, 'accepted')}
-                      className="w-10 h-10 bg-[#EBF2FF] hover:bg-[#d0e0fc] text-[#003893] rounded-xl flex items-center justify-center transition-colors"
-                      style={{ minHeight: '40px', minWidth: '40px' }}
+                      className="w-9 h-9 bg-theme-blue-light border border-theme-blue/15 hover:bg-theme-blue/20 text-theme-blue rounded-xl flex items-center justify-center transition-colors cursor-pointer"
+                      style={{ minHeight: '36px', minWidth: '36px' }}
                       title="수락"
                     >
-                      <Check size={18} />
+                      <Check size={16} />
                     </button>
                   </div>
                 </div>
@@ -177,28 +177,28 @@ export default function ApplicantManagement({ user, roomId, onBack, onEnterChat 
         {/* 2. Processed Applicants */}
         {otherApps.length > 0 && (
           <div className="space-y-2">
-            <h3 className="text-xs font-black text-gray-400 tracking-wider uppercase">처리된 신청 ({otherApps.length})</h3>
+            <h3 className="text-[10px] font-black text-theme-text-muted tracking-wider uppercase ml-1 transition-colors">처리된 신청 ({otherApps.length})</h3>
             <div className="space-y-2">
               {otherApps.map((app) => (
                 <div
                   key={app.id}
-                  className="bg-white/70 rounded-xl p-3 border border-gray-100 flex items-center justify-between text-xs"
+                  className="bg-theme-panel hover:bg-theme-panel/70 rounded-xl p-3 border border-theme-border flex items-center justify-between text-xs transition-colors"
                 >
                   <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 bg-gray-100 text-gray-500 rounded-full flex items-center justify-center font-bold">
+                    <div className="w-7 h-7 bg-theme-input border border-theme-input-border text-theme-text-muted rounded-full flex items-center justify-center font-bold">
                       <User size={14} />
                     </div>
                     <div>
-                      <span className="font-bold text-gray-700">학번: {app.user.student_id}</span>
-                      <span className="text-gray-400 ml-2">({app.user.gender})</span>
+                      <span className="font-bold text-theme-text-secondary transition-colors">학번: {app.user.student_id}</span>
+                      <span className="text-theme-text-muted ml-2">({app.user.gender})</span>
                     </div>
                   </div>
 
                   <div>
                     {app.status === 'accepted' ? (
-                      <span className="px-2 py-1 bg-green-50 text-green-600 rounded-md font-bold">수락됨</span>
+                      <span className="px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 rounded-md font-bold">수락됨</span>
                     ) : (
-                      <span className="px-2 py-1 bg-red-50 text-red-500 rounded-md font-bold">거절됨</span>
+                      <span className="px-2 py-0.5 bg-red-500/10 border border-red-500/20 text-red-500 rounded-md font-bold">거절됨</span>
                     )}
                   </div>
                 </div>

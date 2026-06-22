@@ -1,3 +1,4 @@
+import Script from "next/script";
 import "./globals.css";
 
 export const metadata = {
@@ -13,10 +14,18 @@ export const viewport = {
 };
 
 export default function RootLayout({ children }) {
+  const naverClientId = process.env.NEXT_PUBLIC_NAVER_MAPS_CLIENT_ID;
+
   return (
     <html lang="ko" className="h-full">
       <body className="h-full flex flex-col antialiased">
         {children}
+        {naverClientId && (
+          <Script
+            src={`https://oapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${naverClientId}`}
+            strategy="afterInteractive"
+          />
+        )}
       </body>
     </html>
   );

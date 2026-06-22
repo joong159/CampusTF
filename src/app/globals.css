@@ -2,17 +2,102 @@
 @import "tailwindcss";
 
 :root {
-  --background: #090e1a;
-  --foreground: #f8fafc;
+  /* Light Mode (Default) variables */
+  --background: #f1f5f9;
+  --foreground: #0f172a;
+  
+  --panel-bg: rgba(255, 255, 255, 0.75);
+  --panel-border: rgba(148, 163, 184, 0.15);
+  --panel-shadow: 0 4px 20px -2px rgba(148, 163, 184, 0.12);
+  
+  --input-bg: #ffffff;
+  --input-border: #cbd5e1;
+  --input-focus: #003893;
+  
+  --text-primary: #0f172a;
+  --text-secondary: #334155;
+  --text-muted: #64748b;
+  
+  --header-bg: rgba(255, 255, 255, 0.85);
+  --header-border: rgba(148, 163, 184, 0.15);
+  
+  --emulator-bg: #f8fafc;
+  --device-bezel: #1e293b;
+  --device-notch: #0f172a;
+  
   --university-blue: #003893;
   --university-blue-hover: #002c73;
-  --university-blue-light: rgba(0, 56, 147, 0.1);
+  --university-blue-light: rgba(0, 56, 147, 0.08);
   --accent-gold: #f59e0b;
+  
+  --mesh-color1: rgba(0, 56, 147, 0.08);
+  --mesh-color2: rgba(59, 130, 246, 0.06);
+  --mesh-color3: rgba(139, 92, 246, 0.05);
+  --mesh-color4: rgba(0, 56, 147, 0.06);
+}
+
+[data-theme='dark'] {
+  /* Dark Mode variables */
+  --background: #090e1a;
+  --foreground: #f8fafc;
+  
+  --panel-bg: rgba(255, 255, 255, 0.03);
+  --panel-border: rgba(255, 255, 255, 0.08);
+  --panel-shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.5);
+  
+  --input-bg: #0f172a;
+  --input-border: rgba(255, 255, 255, 0.06);
+  --input-focus: #3b82f6;
+  
+  --text-primary: #f8fafc;
+  --text-secondary: #cbd5e1;
+  --text-muted: #64748b;
+  
+  --header-bg: rgba(9, 14, 26, 0.8);
+  --header-border: rgba(255, 255, 255, 0.05);
+  
+  --emulator-bg: #090e1a;
+  --device-bezel: #1e293b;
+  --device-notch: #1e293b;
+  
+  --university-blue: #3b82f6;
+  --university-blue-hover: #60a5fa;
+  --university-blue-light: rgba(59, 130, 246, 0.15);
+  --accent-gold: #fbbf24;
+  
+  --mesh-color1: rgba(0, 56, 147, 0.25);
+  --mesh-color2: rgba(59, 130, 246, 0.2);
+  --mesh-color3: rgba(139, 92, 246, 0.15);
+  --mesh-color4: rgba(0, 56, 147, 0.2);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
+  --color-theme-bg: var(--background);
+  --color-theme-fg: var(--foreground);
+  
+  --color-theme-panel: var(--panel-bg);
+  --color-theme-border: var(--panel-border);
+  
+  --color-theme-input: var(--input-bg);
+  --color-theme-input-border: var(--input-border);
+  --color-theme-input-focus: var(--input-focus);
+  
+  --color-theme-text-primary: var(--text-primary);
+  --color-theme-text-secondary: var(--text-secondary);
+  --color-theme-text-muted: var(--text-muted);
+  
+  --color-theme-header: var(--header-bg);
+  --color-theme-header-border: var(--header-border);
+  
+  --color-theme-emulator: var(--emulator-bg);
+  --color-theme-bezel: var(--device-bezel);
+  --color-theme-notch: var(--device-notch);
+  
+  --color-theme-blue: var(--university-blue);
+  --color-theme-blue-hover: var(--university-blue-hover);
+  --color-theme-blue-light: var(--university-blue-light);
+  --color-theme-gold: var(--accent-gold);
+  
   --font-sans: "Pretendard", -apple-system, BlinkMacSystemFont, system-ui, sans-serif;
 }
 
@@ -29,17 +114,19 @@ body {
   min-height: 100vh;
   overflow-x: hidden;
   position: relative;
+  transition: background-color 0.3s ease, color 0.3s ease;
 }
 
 /* Beautiful Animated Mesh Gradient Background */
 .mesh-bg {
-  background-color: #090e1a;
+  background-color: var(--background);
   background-image: 
-    radial-gradient(at 0% 0%, rgba(0, 56, 147, 0.25) 0px, transparent 50%),
-    radial-gradient(at 100% 0%, rgba(59, 130, 246, 0.2) 0px, transparent 50%),
-    radial-gradient(at 100% 100%, rgba(139, 92, 246, 0.15) 0px, transparent 50%),
-    radial-gradient(at 0% 100%, rgba(0, 56, 147, 0.2) 0px, transparent 50%);
+    radial-gradient(at 0% 0%, var(--mesh-color1) 0px, transparent 50%),
+    radial-gradient(at 100% 0%, var(--mesh-color2) 0px, transparent 50%),
+    radial-gradient(at 100% 100%, var(--mesh-color3) 0px, transparent 50%),
+    radial-gradient(at 0% 100%, var(--mesh-color4) 0px, transparent 50%);
   background-attachment: fixed;
+  transition: background-color 0.3s ease;
 }
 
 /* Glassmorphism Panel styles */
