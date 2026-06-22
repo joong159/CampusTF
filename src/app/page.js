@@ -7,7 +7,7 @@ import Home from '@/components/Home';
 import CreateRoom from '@/components/CreateRoom';
 import ChatRoom from '@/components/ChatRoom';
 import ApplicantManagement from '@/components/ApplicantManagement';
-import { Database, AlertCircle } from 'lucide-react';
+import { Database, Landmark, PhoneCall, Smartphone, Sparkles, Navigation } from 'lucide-react';
 
 export default function App() {
   const [view, setView] = useState('loading'); // loading, login, home, create, chat, manage
@@ -95,70 +95,148 @@ export default function App() {
   };
 
   return (
-    <div className="w-full min-h-screen bg-gray-100 flex justify-center">
-      {/* Mobile-sized Container */}
-      <div className="w-full max-w-[480px] min-h-screen bg-white shadow-2xl flex flex-col relative overflow-hidden">
-        {/* Mock Mode Notice Banner */}
-        {isMock && view !== 'loading' && (
-          <div className="bg-blue-600 text-white px-4 py-2 flex items-center justify-between text-xs z-50 font-medium">
-            <span className="flex items-center gap-1.5">
-              <Database size={13} className="animate-pulse" />
-              데모 테스트 중 (Supabase 미연결)
-            </span>
-            <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded text-white/90">
-              LocalStorage 작동
-            </span>
-          </div>
-        )}
-
-        {/* Screen Controller */}
-        {view === 'loading' && (
-          <div className="flex-1 flex flex-col items-center justify-center bg-white">
-            <div className="w-12 h-12 bg-[#003893] rounded-2xl flex items-center justify-center shadow-md animate-pulse mb-3">
-              <span className="text-white text-2xl font-black">T</span>
+    <div className="w-full min-h-screen bg-slate-100 flex items-center justify-center md:p-6 lg:p-10 font-sans">
+      {/* Container holding left branding page + right app emulator on PC */}
+      <div className="w-full max-w-6xl flex flex-col md:flex-row items-center justify-center gap-10 lg:gap-20">
+        
+        {/* LEFT PANE: Branding / Marketing Landing Page (Hidden on Mobile) */}
+        <div className="hidden md:flex flex-col md:w-1/2 max-w-lg text-left space-y-6">
+          <div className="space-y-4">
+            <div className="inline-flex items-center gap-1.5 px-3 py-1 bg-[#EBF2FF] text-[#003893] text-xs font-bold rounded-full">
+              <Sparkles size={13} />
+              대진대 전용 택시 팟 매칭 서비스
             </div>
-            <span className="w-6 h-6 border-2 border-[#003893] border-t-transparent rounded-full animate-spin"></span>
+            <h1 className="text-4xl lg:text-5xl font-extrabold text-gray-900 leading-tight tracking-tight">
+              등하교 택시비,<br />
+              <span className="text-[#003893]">학우들과 1/N</span>으로<br />
+              부담 없이 가볍게!
+            </h1>
+            <p className="text-gray-500 text-sm leading-relaxed">
+              <strong>대진대 택시 타자</strong>는 대중교통 배차가 긴 아침 지각 위기 상황이나 비용 부담이 클 때,
+              출발지가 같은 동승자를 실시간 매칭하고, 정산 계좌 연동 및 요금 분할 UI로 편안한 통학을 돕습니다.
+            </p>
           </div>
-        )}
 
-        {view === 'login' && (
-          <Login onLoginSuccess={handleLoginSuccess} />
-        )}
+          {/* Core Feature Grids */}
+          <div className="grid grid-cols-2 gap-4">
+            <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-150/60 space-y-1.5">
+              <div className="w-8 h-8 rounded-lg bg-[#EBF2FF] flex items-center justify-center text-[#003893]">
+                <Navigation size={16} />
+              </div>
+              <h4 className="font-bold text-gray-800 text-xs">경로 기반 팟 추천</h4>
+              <p className="text-[10px] text-gray-400 leading-normal">
+                대진대 정문, 대진대역, 포천터미널 등 목적지와 같은 방을 즉시 필터링해 줍니다.
+              </p>
+            </div>
+            
+            <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-150/60 space-y-1.5">
+              <div className="w-8 h-8 rounded-lg bg-purple-50 flex items-center justify-center text-purple-600">
+                <Smartphone size={16} />
+              </div>
+              <h4 className="font-bold text-gray-800 text-xs">동성 동승 옵션</h4>
+              <p className="text-[10px] text-gray-400 leading-normal">
+                동성만 매칭 옵션을 지원하여 여학생 전용 / 남학생 전용으로 안전하게 탑승 가능합니다.
+              </p>
+            </div>
 
-        {view === 'home' && user && (
-          <Home
-            user={user}
-            onSelectRoom={handleSelectRoom}
-            onCreateRoomClick={() => setView('create')}
-            onLogout={handleLogout}
-          />
-        )}
+            <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-150/60 space-y-1.5">
+              <div className="w-8 h-8 rounded-lg bg-green-50 flex items-center justify-center text-green-600">
+                <Landmark size={16} />
+              </div>
+              <h4 className="font-bold text-gray-800 text-xs">N분의 1 자동 정산</h4>
+              <p className="text-[10px] text-gray-400 leading-normal">
+                실제 요금만 입력하면 탑승 인원에 맞추어 1원 단위까지 정산액을 계산해 고지합니다.
+              </p>
+            </div>
 
-        {view === 'create' && user && (
-          <CreateRoom
-            user={user}
-            onBack={() => setView('home')}
-            onRoomCreated={handleRoomCreated}
-          />
-        )}
+            <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-150/60 space-y-1.5">
+              <div className="w-8 h-8 rounded-lg bg-amber-50 flex items-center justify-center text-amber-500">
+                <PhoneCall size={16} />
+              </div>
+              <h4 className="font-bold text-gray-800 text-xs">수락 방식 관리 & 톡</h4>
+              <p className="text-[10px] text-gray-400 leading-normal">
+                방장 수락 완료 후 실시간 채팅방이 활성화되어 미인증 탑승자의 난입을 차단합니다.
+              </p>
+            </div>
+          </div>
 
-        {view === 'manage' && user && activeRoomId && (
-          <ApplicantManagement
-            user={user}
-            roomId={activeRoomId}
-            onBack={() => setView('home')}
-            onEnterChat={() => setView('chat')}
-          />
-        )}
+          <div className="pt-2 text-[11px] text-gray-400 font-semibold flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-green-500 animate-ping"></span>
+            웹/앱 반응형 하이브리드 UI: 현재 모바일 프리뷰 작동 중
+          </div>
+        </div>
 
-        {view === 'chat' && user && activeRoomId && (
-          <ChatRoom
-            user={user}
-            roomId={activeRoomId}
-            onBack={() => setView('home')}
-            onGoToManage={() => setView('manage')}
-          />
-        )}
+        {/* RIGHT PANE: Smartphone Emulator on PC, Full Screen on Mobile */}
+        <div className="w-full max-w-[430px] min-h-screen md:min-h-[820px] md:h-[840px] bg-white md:rounded-[42px] md:shadow-2xl md:border-[10px] md:border-slate-800 flex flex-col relative overflow-hidden transform transition-all">
+          
+          {/* Simulated Smartphone Notch/Speaker (Visible on PC only) */}
+          <div className="hidden md:block w-36 h-6 bg-slate-800 absolute top-0 left-1/2 transform -translate-x-1/2 rounded-b-2xl z-50"></div>
+          
+          {/* Demo Mode Top Bar */}
+          {isMock && view !== 'loading' && (
+            <div className="bg-blue-600 text-white px-4 py-2 flex items-center justify-between text-xs z-40 font-medium md:mt-5">
+              <span className="flex items-center gap-1.5">
+                <Database size={13} className="animate-pulse" />
+                데모 테스트 중 (Supabase 미연결)
+              </span>
+              <span className="text-[10px] bg-white/20 px-2 py-0.5 rounded text-white/90">
+                LocalStorage 작동
+              </span>
+            </div>
+          )}
+
+          {/* App View Area */}
+          <div className={`flex-1 flex flex-col overflow-y-auto ${isMock ? '' : 'md:mt-5'}`}>
+            {view === 'loading' && (
+              <div className="flex-grow flex flex-col items-center justify-center bg-white">
+                <div className="w-12 h-12 bg-[#003893] rounded-2xl flex items-center justify-center shadow-md animate-pulse mb-3">
+                  <span className="text-white text-2xl font-black">T</span>
+                </div>
+                <span className="w-6 h-6 border-2 border-[#003893] border-t-transparent rounded-full animate-spin"></span>
+              </div>
+            )}
+
+            {view === 'login' && (
+              <Login onLoginSuccess={handleLoginSuccess} />
+            )}
+
+            {view === 'home' && user && (
+              <Home
+                user={user}
+                onSelectRoom={handleSelectRoom}
+                onCreateRoomClick={() => setView('create')}
+                onLogout={handleLogout}
+              />
+            )}
+
+            {view === 'create' && user && (
+              <CreateRoom
+                user={user}
+                onBack={() => setView('home')}
+                onRoomCreated={handleRoomCreated}
+              />
+            )}
+
+            {view === 'manage' && user && activeRoomId && (
+              <ApplicantManagement
+                user={user}
+                roomId={activeRoomId}
+                onBack={() => setView('home')}
+                onEnterChat={() => setView('chat')}
+              />
+            )}
+
+            {view === 'chat' && user && activeRoomId && (
+              <ChatRoom
+                user={user}
+                roomId={activeRoomId}
+                onBack={() => setView('home')}
+                onGoToManage={() => setView('manage')}
+              />
+            )}
+          </div>
+        </div>
+
       </div>
     </div>
   );
