@@ -2,6 +2,7 @@
 
 import { useState } from 'react';
 import { api } from '@/lib/api';
+import NaverMap from '@/components/NaverMap';
 import { ArrowLeft, MapPin, Clock, Users, ShieldAlert, CreditCard, Link } from 'lucide-react';
 
 export default function CreateRoom({ user, onBack, onRoomCreated }) {
@@ -145,6 +146,14 @@ export default function CreateRoom({ user, onBack, onRoomCreated }) {
               ))}
             </div>
           </div>
+
+          {/* Map Preview */}
+          {(departure || destination) && (
+            <div className="space-y-1.5 pt-1 animate-fade-in">
+              <span className="block text-xs font-bold text-gray-700 ml-1">경로 지도 프리뷰</span>
+              <NaverMap departure={departure} destination={destination} />
+            </div>
+          )}
         </div>
 
         {/* Departure Time & Capacity */}

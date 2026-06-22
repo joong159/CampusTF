@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { api } from '@/lib/api';
+import NaverMap from '@/components/NaverMap';
 import { 
   ArrowLeft, Send, AlertTriangle, Landmark, 
   ChevronRight, Calculator, Check, Copy, ExternalLink, RefreshCw 
@@ -16,6 +17,7 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
   const [totalFareInput, setTotalFareInput] = useState('');
   const [loading, setLoading] = useState(true);
   const [copied, setCopied] = useState(false);
+  const [showMap, setShowMap] = useState(false);
   
   const messagesEndRef = useRef(null);
 
@@ -213,6 +215,28 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
           <p className="leading-normal font-semibold">
             🚨 <strong>안내:</strong> 운행 중 실제 탑승 후 방장에게 N분의 1 금액 송금하는 것을 잊지 마세요!
           </p>
+        </div>
+
+        {/* Collapsible Naver Route Map */}
+        <div className="border border-gray-100 rounded-xl overflow-hidden shadow-sm">
+          <button
+            type="button"
+            onClick={() => setShowMap(!showMap)}
+            className="w-full px-3 py-2 bg-slate-50 hover:bg-slate-100 text-slate-700 text-xs font-bold flex items-center justify-between transition-colors"
+            style={{ minHeight: '36px' }}
+          >
+            <span className="flex items-center gap-1.5">
+              <span>🗺️</span>
+              동승 경로 지도 {showMap ? '접기' : '펼치기'}
+            </span>
+            <ChevronRight size={14} className={`transform transition-transform ${showMap ? 'rotate-90' : ''}`} />
+          </button>
+          
+          {showMap && (
+            <div className="p-2 bg-white border-t border-gray-100 animate-fade-in">
+              <NaverMap departure={room.departure} destination={room.destination} />
+            </div>
+          )}
         </div>
 
         {/* Settlement Info / Account Guide Banner */}
