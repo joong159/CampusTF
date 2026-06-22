@@ -205,6 +205,23 @@ function findClosestLandmark(lat, lng) {
   return { landmark: closest, distance: minDistance };
 }
 
+const MOCK_FARES = {
+  'station-main_gate': { distance: '4.5km', fare: 7500, duration: '8분' },
+  'main_gate-station': { distance: '4.5km', fare: 7500, duration: '8분' },
+  'station-engineering_bldg': { distance: '5.2km', fare: 8300, duration: '10분' },
+  'engineering_bldg-station': { distance: '5.2km', fare: 8300, duration: '10분' },
+  'main_gate-engineering_bldg': { distance: '1.2km', fare: 4800, duration: '3분' },
+  'engineering_bldg-main_gate': { distance: '1.2km', fare: 4800, duration: '3분' },
+  'terminal-main_gate': { distance: '6.8km', fare: 10200, duration: '12분' },
+  'main_gate-terminal': { distance: '6.8km', fare: 10200, duration: '12분' },
+  'terminal-engineering_bldg': { distance: '7.5km', fare: 11000, duration: '14분' },
+  'engineering_bldg-terminal': { distance: '7.5km', fare: 11000, duration: '14분' },
+  'uijeongbu-main_gate': { distance: '17.5km', fare: 23500, duration: '25분' },
+  'main_gate-uijeongbu': { distance: '17.5km', fare: 23500, duration: '25분' },
+  'uijeongbu-engineering_bldg': { distance: '18.2km', fare: 24300, duration: '27분' },
+  'engineering_bldg-uijeongbu': { distance: '18.2km', fare: 24300, duration: '27분' },
+};
+
 export async function GET(request) {
   const { searchParams } = new URL(request.url);
   const start = searchParams.get('start'); // "lng,lat"
@@ -218,26 +235,53 @@ export async function GET(request) {
     const [startLng, startLat] = start.split(',').map(Number);
     const [goalLng, goalLat] = goal.split(',').map(Number);
 
-    const clientId = process.env.NEXT_PUBLIC_NAVER_MAPS_CLIENT_ID || 'e4er7uvr2b';
-    const clientSecret = process.env.NAVER_MAPS_CLIENT_SECRET;
+    const restApiKey = process.env.KAKAO_REST_API_KEY;
 
-    // 1. If NAVER_MAPS_CLIENT_SECRET is available, try the real Directions API
-    if (clientSecret && clientSecret !== '여기에-네이버-맵-client-secret') {
-      const url = `https://naveropenapi.apigw.ntruss.com/map-direction/v1/driving?start=${startLng},${startLat}&goal=${goalLng},${goalLat}&option=trafast`;
+    // 1. If KAKAO_REST_API_KEY is available, try the real Kakao Mobility Directions API
+    if (restApiKey && restApiKey !== '여기에-카카오-모빌리티-rest-api-키' && !restApiKey.includes('여기에')) {
+      const url = `https://apis-navi.kakaomobility.com/v1/directions?origin=${startLng},${startLat}&destination=${goalLng},${goalLat}`;
       
       const response = await fetch(url, {
         headers: {
-          'X-NCP-APIGW-API-KEY-ID': clientId,
-          'X-NCP-APIGW-API-KEY': clientSecret
+          'Authorization': `KakaoAK ${restApiKey}`,
+          'Content-Type': 'application/json'
         }
       });
 
       if (response.ok) {
         const data = await response.json();
-        if (data.route && data.route.trafast && data.route.trafast[0]) {
-          const naverPath = data.route.trafast[0].path;
-          const path = naverPath.map(([lng, lat]) => ({ lat, lng }));
-          return NextResponse.json({ path });
+        if (data.routes && data.routes[0]) {
+          const route = data.routes[0];
+          
+          // Parse coordinates from sections/roads
+          const path = [];
+          if (route.sections) {
+            route.sections.forEach(section => {
+              if (section.roads) {
+                section.roads.forEach(road => {
+                  if (road.vertexes) {
+                    for (let i = 0; i < road.vertexes.length; i += 2) {
+                      const lng = road.vertexes[i];
+                      const lat = road.vertexes[i + 1];
+                      path.push({ lat, lng });
+                    }
+                  }
+                });
+              }
+            });
+          }
+          
+          // Extract fare and details
+          const taxiFare = route.summary?.fare?.taxi || 8000;
+          const distance = route.summary?.distance || 5000; // in meters
+          const duration = route.summary?.duration || 600; // in seconds
+
+          return NextResponse.json({ 
+            path, 
+            taxiFare, 
+            distance: (distance / 1000).toFixed(1) + 'km',
+            duration: Math.round(duration / 60) + '분'
+          });
         }
       }
     }
@@ -249,7 +293,13 @@ export async function GET(request) {
     if (closestStart.distance < 0.003 && closestGoal.distance < 0.003) {
       const key = `${closestStart.landmark.name}-${closestGoal.landmark.name}`;
       if (PRESET_PATHS[key]) {
-        return NextResponse.json({ path: PRESET_PATHS[key] });
+        const fallbackData = MOCK_FARES[key] || { distance: '5.0km', fare: 8000, duration: '10분' };
+        return NextResponse.json({ 
+          path: PRESET_PATHS[key],
+          taxiFare: fallbackData.fare,
+          distance: fallbackData.distance,
+          duration: fallbackData.duration
+        });
       }
     }
 
@@ -267,7 +317,12 @@ export async function GET(request) {
       { lat: goalLat, lng: goalLng }
     ];
 
-    return NextResponse.json({ path });
+    return NextResponse.json({ 
+      path,
+      taxiFare: 8000,
+      distance: '5.0km',
+      duration: '10분'
+    });
 
   } catch (error) {
     console.error('Error in directions API route:', error);

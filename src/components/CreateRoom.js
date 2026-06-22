@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { api } from '@/lib/api';
-import NaverMap, { getRouteDetails } from '@/components/NaverMap';
+import KakaoMap, { getRouteDetails } from '@/components/KakaoMap';
 import { ArrowLeft, MapPin, Clock, Users, ShieldAlert, CreditCard, Link, Landmark } from 'lucide-react';
 
 export default function CreateRoom({ user, onBack, onRoomCreated }) {
@@ -135,7 +135,7 @@ export default function CreateRoom({ user, onBack, onRoomCreated }) {
           {(departure || destination) && (
             <div className="space-y-2 pt-1 animate-fade-in">
               <span className="block text-[10px] font-black text-theme-text-muted ml-1 uppercase tracking-wide transition-colors">경로 지도 프리뷰</span>
-              <NaverMap departure={departure} destination={destination} />
+              <KakaoMap departure={departure} destination={destination} />
             </div>
           )}
 

@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { api } from '@/lib/api';
-import NaverMap from '@/components/NaverMap';
+import KakaoMap from '@/components/KakaoMap';
 import { 
   ArrowLeft, Send, AlertTriangle, Landmark, 
   ChevronRight, Calculator, Check, Copy, ExternalLink, RefreshCw, UserCheck
@@ -254,7 +254,7 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
           </p>
         </div>
 
-        {/* Collapsible Naver Route Map */}
+        {/* Collapsible Kakao Route Map */}
         <div className="border border-theme-border rounded-2xl overflow-hidden bg-theme-input transition-colors">
           <button
             type="button"
@@ -271,7 +271,7 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
           
           {showMap && (
             <div className="p-2 bg-theme-input border-t border-theme-border animate-fade-in transition-colors">
-              <NaverMap departure={room.departure} destination={room.destination} />
+              <KakaoMap departure={room.departure} destination={room.destination} />
             </div>
           )}
         </div>

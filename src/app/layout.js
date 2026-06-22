@@ -14,16 +14,19 @@ export const viewport = {
 };
 
 export default function RootLayout({ children }) {
-  const naverClientId = process.env.NEXT_PUBLIC_NAVER_MAPS_CLIENT_ID || 'e4er7uvr2b';
+  const kakaoAppKey = process.env.NEXT_PUBLIC_KAKAO_MAPS_APP_KEY || '';
+  const loadKakao = kakaoAppKey && kakaoAppKey !== '여기에-카카오-맵-자바스크립트-키' && !kakaoAppKey.includes('여기에');
 
   return (
     <html lang="ko" className="h-full">
       <body className="h-full flex flex-col antialiased">
         {children}
-        <Script
-          src={`https://oapi.map.naver.com/openapi/v3/maps.js?ncpClientId=${naverClientId}`}
-          strategy="afterInteractive"
-        />
+        {loadKakao && (
+          <Script
+            src={`https://dapi.kakao.com/v2/maps/sdk.js?appkey=${kakaoAppKey}&autoload=false&libraries=services`}
+            strategy="afterInteractive"
+          />
+        )}
       </body>
     </html>
   );
