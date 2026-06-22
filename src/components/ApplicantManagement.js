@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { api } from '@/lib/api';
 import { ArrowLeft, User, Check, X, ShieldAlert, MessageCircle } from 'lucide-react';
 
@@ -9,7 +9,7 @@ export default function ApplicantManagement({ user, roomId, onBack, onEnterChat 
   const [applicants, setApplicants] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     try {
       const roomsList = await api.rooms.list();
       const currentRoom = roomsList.find(r => r.id === roomId);
@@ -24,13 +24,18 @@ export default function ApplicantManagement({ user, roomId, onBack, onEnterChat 
     } finally {
       setLoading(false);
     }
-  };
+  }, [roomId]);
 
   useEffect(() => {
-    fetchData();
+    const timeout = setTimeout(() => {
+      fetchData();
+    }, 0);
     const interval = setInterval(fetchData, 3000);
-    return () => clearInterval(interval);
-  }, [roomId]);
+    return () => {
+      clearTimeout(timeout);
+      clearInterval(interval);
+    };
+  }, [roomId, fetchData]);
 
   const handleStatusUpdate = async (applicantId, status) => {
     const actionLabel = status === 'accepted' ? '수락' : '거절';

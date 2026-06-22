@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { api } from '@/lib/api';
 import { 
   Search, Plus, LogOut, Navigation, MapPin, 
@@ -12,30 +12,41 @@ export default function Home({ user, onSelectRoom, onCreateRoomClick, onLogout }
   const [departure, setDeparture] = useState('');
   const [destination, setDestination] = useState('');
   const [loading, setLoading] = useState(true);
-  const [currentTime, setCurrentTime] = useState(Date.now());
+  const [currentTime, setCurrentTime] = useState(0);
 
   // Quick select locations
   const locations = ['대진대 정문', '대진대역 1번출구', '포천터미널', '의정부역'];
 
-  const fetchRooms = async () => {
+  const fetchRooms = useCallback(async () => {
     setLoading(true);
     const data = await api.rooms.list();
     setRooms(data);
     setLoading(false);
-  };
-
-  useEffect(() => {
-    fetchRooms();
-    // Refresh rooms periodically (simulated live sync)
-    const interval = setInterval(fetchRooms, 4000);
-    return () => clearInterval(interval);
   }, []);
 
   useEffect(() => {
+    const timeout = setTimeout(() => {
+      fetchRooms();
+    }, 0);
+    // Refresh rooms periodically (simulated live sync)
+    const interval = setInterval(fetchRooms, 4000);
+    return () => {
+      clearTimeout(timeout);
+      clearInterval(interval);
+    };
+  }, [fetchRooms]);
+
+  useEffect(() => {
+    const timeout = setTimeout(() => {
+      setCurrentTime(Date.now());
+    }, 0);
     const timer = setInterval(() => {
       setCurrentTime(Date.now());
     }, 10000); // update every 10s
-    return () => clearInterval(timer);
+    return () => {
+      clearTimeout(timeout);
+      clearInterval(timer);
+    };
   }, []);
 
   const renderCountdownBadge = (timeStr, status) => {

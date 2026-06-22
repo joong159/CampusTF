@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { api } from '@/lib/api';
 import NaverMap from '@/components/NaverMap';
 import { 
@@ -22,7 +22,7 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
   
   const messagesEndRef = useRef(null);
 
-  const fetchRoomData = async () => {
+  const fetchRoomData = useCallback(async () => {
     try {
       const roomsList = await api.rooms.list();
       const currentRoom = roomsList.find(r => r.id === roomId);
@@ -43,10 +43,12 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
     } finally {
       setLoading(false);
     }
-  };
+  }, [roomId, user.id]);
 
   useEffect(() => {
-    fetchRoomData();
+    const timeout = setTimeout(() => {
+      fetchRoomData();
+    }, 0);
     
     // Subscribe to realtime messages & room updates
     const unsubscribe = api.chats.subscribe(
@@ -68,9 +70,10 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
 
     return () => {
       unsubscribe();
+      clearTimeout(timeout);
       clearInterval(pollInterval);
     };
-  }, [roomId]);
+  }, [roomId, fetchRoomData]);
 
   // Scroll to bottom when messages load/change
   useEffect(() => {

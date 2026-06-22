@@ -75,6 +75,20 @@ export default function NaverMap({ departure, destination }) {
   const depCoords = getCoordinates(departure, LANDMARK_COORDS.station);
   const destCoords = getCoordinates(destination, LANDMARK_COORDS.main_gate);
 
+  // Cleanup simulation on unmount
+  const stopSimulation = () => {
+    setIsSimulating(false);
+    if (simIntervalRef.current) {
+      clearInterval(simIntervalRef.current);
+      simIntervalRef.current = null;
+    }
+    if (carMarkerRef.current) {
+      carMarkerRef.current.setMap(null);
+      carMarkerRef.current = null;
+    }
+    setMockProgress(0);
+  };
+
   useEffect(() => {
     let active = true;
     const fetchRoute = async () => {
@@ -107,12 +121,12 @@ export default function NaverMap({ departure, destination }) {
   useEffect(() => {
     if (typeof window !== 'undefined') {
       if (window.naver && window.naver.maps) {
-        setScriptLoaded(true);
+        setTimeout(() => setScriptLoaded(true), 0);
       } else {
         // Poll until global Naver Map script loads in layout
         const interval = setInterval(() => {
           if (window.naver && window.naver.maps) {
-            setScriptLoaded(true);
+            setTimeout(() => setScriptLoaded(true), 0);
             clearInterval(interval);
           }
         }, 150);
@@ -130,20 +144,6 @@ export default function NaverMap({ departure, destination }) {
     }
     return () => stopSimulation();
   }, []);
-
-  // Cleanup simulation on unmount
-  const stopSimulation = () => {
-    setIsSimulating(false);
-    if (simIntervalRef.current) {
-      clearInterval(simIntervalRef.current);
-      simIntervalRef.current = null;
-    }
-    if (carMarkerRef.current) {
-      carMarkerRef.current.setMap(null);
-      carMarkerRef.current = null;
-    }
-    setMockProgress(0);
-  };
 
   // Start GPS Simulation
   const startSimulation = () => {
@@ -318,7 +318,7 @@ export default function NaverMap({ departure, destination }) {
 
     } catch (e) {
       console.error('Failed to render Naver Map:', e);
-      setMapError(true);
+      setTimeout(() => setMapError(true), 0);
     }
   }, [scriptLoaded, departure, destination, depCoords.lat, depCoords.lng, destCoords.lat, destCoords.lng, routePath]);
 
