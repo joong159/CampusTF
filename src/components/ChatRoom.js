@@ -60,6 +60,15 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
   const [guestIsMidway, setGuestIsMidway] = useState(false);
   const [applyingMidway, setApplyingMidway] = useState(false); // midway toggle on application banner
 
+  // Route modal state
+  const [showRouteModal, setShowRouteModal] = useState(false);
+  const [routeDep, setRouteDep] = useState(null); // { name, lat, lng }
+  const [routeDest, setRouteDest] = useState(null); // { name, lat, lng }
+  const [depSearchInput, setDepSearchInput] = useState('');
+  const [destSearchInput, setDestSearchInput] = useState('');
+  const [depResults, setDepResults] = useState([]);
+  const [destResults, setDestResults] = useState([]);
+
   const chatContainerRef = useRef(null);
 
   const fetchRoomData = useCallback(async () => {
@@ -176,17 +185,52 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
     setTimeout(() => setCopied(false), 2000);
   };
 
-  const openKakaoTaxiLink = () => {
+  // 경로 검색 모달 열기 (방 기본 출발지/목적지로 초기화)
+  const openRouteModal = () => {
     if (!room) return;
     const depC = getCoordinates(room.departure, LANDMARK_COORDS.station);
     const destC = getCoordinates(room.destination, LANDMARK_COORDS.main_gate);
     const depName = getDisplayLocation(room.departure);
     const destName = getDisplayLocation(room.destination);
+    setRouteDep({ name: depName, lat: depC.lat, lng: depC.lng });
+    setRouteDest({ name: destName, lat: destC.lat, lng: destC.lng });
+    setDepSearchInput(depName);
+    setDestSearchInput(destName);
+    setDepResults([]);
+    setDestResults([]);
+    setShowRouteModal(true);
+  };
 
-    // 카카오맵 공식 문서 포맷: 한글 이름을 그대로 사용 (인코딩 X)
-    // 참고: https://apis.map.kakao.com/web/guide/#mapurl
-    const url = `https://map.kakao.com/link/from/${depName},${depC.lat},${depC.lng}/to/${destName},${destC.lat},${destC.lng}`;
+  // 카카오 장소 검색 API 호출
+  const searchKakaoPlaces = (keyword, setResults) => {
+    if (!keyword.trim()) { setResults([]); return; }
+    if (!window.kakao?.maps?.services) {
+      alert('카카오 지도 API를 불러오는 중입니다. 잠시 후 다시 시도해주세요.');
+      return;
+    }
+    const places = new window.kakao.maps.services.Places();
+    places.keywordSearch(keyword, (result, status) => {
+      if (status === window.kakao.maps.services.Status.OK) {
+        setResults(result.slice(0, 5).map(p => ({
+          name: p.place_name,
+          address: p.road_address_name || p.address_name,
+          lat: parseFloat(p.y),
+          lng: parseFloat(p.x),
+        })));
+      } else {
+        setResults([]);
+        alert('검색 결과가 없습니다. 다른 검색어를 입력해보세요.');
+      }
+    });
+  };
+
+  // 카카오맵 공식 URL 포맷으로 경로 열기
+  // 참고: https://apis.map.kakao.com/web/guide/#routeurl
+  const confirmRoute = () => {
+    if (!routeDep || !routeDest) return;
+    const url = `https://map.kakao.com/link/from/${routeDep.name},${routeDep.lat},${routeDep.lng}/to/${routeDest.name},${routeDest.lat},${routeDest.lng}`;
     window.open(url, '_blank');
+    setShowRouteModal(false);
   };
 
   // State Management actions
@@ -378,11 +422,11 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
               <KakaoMap departure={room.departure} destination={room.destination} />
               <button
                 type="button"
-                onClick={openKakaoTaxiLink}
+                onClick={openRouteModal}
                 className="w-full py-2 bg-yellow-400 hover:bg-yellow-500 text-yellow-950 text-xs font-bold rounded-xl flex items-center justify-center gap-1.5 shadow-sm active:scale-[0.98] transition-all cursor-pointer"
                 style={{ minHeight: '36px' }}
               >
-                🚕 카카오 T 앱으로 경로 확인 및 호출하기
+                🚕 경로 확인 및 카카오맵 호출하기
               </button>
             </div>
           )}
@@ -772,6 +816,131 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {/* 경로 검색 모달 */}
+      {showRouteModal && (
+        <div className="fixed inset-0 bg-slate-950/70 backdrop-blur-sm flex items-end sm:items-center justify-center p-4 z-50 animate-fade-in">
+          <div className="bg-theme-emulator border border-theme-border rounded-3xl p-5 w-full max-w-[380px] shadow-2xl space-y-4 transition-colors">
+            {/* Header */}
+            <div className="text-center">
+              <span className="text-3xl block mb-1">🗺️</span>
+              <h3 className="text-base font-black text-theme-text-primary">경로 검색</h3>
+              <p className="text-[10px] text-theme-text-muted mt-1 leading-relaxed">
+                출발지와 목적지를 검색하거나 수정한 후 카카오맵에서 경로를 확인하세요.
+              </p>
+            </div>
+
+            {/* 출발지 검색 */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-theme-text-secondary ml-1">🚩 출발지</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={depSearchInput}
+                  onChange={e => setDepSearchInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && searchKakaoPlaces(depSearchInput, setDepResults)}
+                  placeholder="출발지를 검색하세요 (예: 의정부역)"
+                  className="flex-1 px-3 py-2.5 bg-theme-input border border-theme-input-border rounded-xl text-xs focus:outline-none focus:border-theme-input-focus text-theme-text-primary placeholder-theme-text-muted/60 transition-all"
+                />
+                <button
+                  type="button"
+                  onClick={() => searchKakaoPlaces(depSearchInput, setDepResults)}
+                  className="px-3 py-2.5 bg-[#003893] text-white text-xs font-bold rounded-xl cursor-pointer hover:bg-blue-600 active:scale-95 transition-all whitespace-nowrap"
+                >
+                  검색
+                </button>
+              </div>
+              {routeDep && depResults.length === 0 && (
+                <div className="text-[10px] text-emerald-500 ml-1 flex items-center gap-1">
+                  <span>✓</span>
+                  <span className="font-bold truncate">{routeDep.name}</span>
+                  <span className="text-theme-text-muted">선택됨</span>
+                </div>
+              )}
+              {depResults.length > 0 && (
+                <div className="bg-theme-panel border border-theme-border rounded-xl overflow-hidden divide-y divide-theme-border shadow-sm">
+                  {depResults.map((r, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => { setRouteDep(r); setDepSearchInput(r.name); setDepResults([]); }}
+                      className="w-full px-3 py-2.5 text-left hover:bg-theme-input transition-colors cursor-pointer"
+                    >
+                      <div className="text-xs font-bold text-theme-text-primary">{r.name}</div>
+                      <div className="text-[10px] text-theme-text-muted mt-0.5">{r.address}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* 목적지 검색 */}
+            <div className="space-y-1.5">
+              <label className="block text-xs font-bold text-theme-text-secondary ml-1">📍 목적지</label>
+              <div className="flex gap-2">
+                <input
+                  type="text"
+                  value={destSearchInput}
+                  onChange={e => setDestSearchInput(e.target.value)}
+                  onKeyDown={e => e.key === 'Enter' && searchKakaoPlaces(destSearchInput, setDestResults)}
+                  placeholder="목적지를 검색하세요 (예: 대진대학교)"
+                  className="flex-1 px-3 py-2.5 bg-theme-input border border-theme-input-border rounded-xl text-xs focus:outline-none focus:border-theme-input-focus text-theme-text-primary placeholder-theme-text-muted/60 transition-all"
+                />
+                <button
+                  type="button"
+                  onClick={() => searchKakaoPlaces(destSearchInput, setDestResults)}
+                  className="px-3 py-2.5 bg-[#003893] text-white text-xs font-bold rounded-xl cursor-pointer hover:bg-blue-600 active:scale-95 transition-all whitespace-nowrap"
+                >
+                  검색
+                </button>
+              </div>
+              {routeDest && destResults.length === 0 && (
+                <div className="text-[10px] text-emerald-500 ml-1 flex items-center gap-1">
+                  <span>✓</span>
+                  <span className="font-bold truncate">{routeDest.name}</span>
+                  <span className="text-theme-text-muted">선택됨</span>
+                </div>
+              )}
+              {destResults.length > 0 && (
+                <div className="bg-theme-panel border border-theme-border rounded-xl overflow-hidden divide-y divide-theme-border shadow-sm">
+                  {destResults.map((r, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onClick={() => { setRouteDest(r); setDestSearchInput(r.name); setDestResults([]); }}
+                      className="w-full px-3 py-2.5 text-left hover:bg-theme-input transition-colors cursor-pointer"
+                    >
+                      <div className="text-xs font-bold text-theme-text-primary">{r.name}</div>
+                      <div className="text-[10px] text-theme-text-muted mt-0.5">{r.address}</div>
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* 버튼 */}
+            <div className="flex gap-2 pt-1">
+              <button
+                type="button"
+                onClick={() => setShowRouteModal(false)}
+                className="flex-1 py-3 bg-theme-panel hover:bg-theme-panel/70 text-theme-text-secondary border border-theme-border text-xs font-bold rounded-2xl transition-colors cursor-pointer"
+                style={{ minHeight: '44px' }}
+              >
+                닫기
+              </button>
+              <button
+                type="button"
+                onClick={confirmRoute}
+                disabled={!routeDep || !routeDest}
+                className="flex-1 py-3 bg-yellow-400 hover:bg-yellow-500 disabled:opacity-50 disabled:cursor-not-allowed text-yellow-950 text-xs font-bold rounded-2xl shadow-sm cursor-pointer transition-colors flex items-center justify-center gap-1.5"
+                style={{ minHeight: '44px' }}
+              >
+                🚕 카카오맵으로 보기
+              </button>
+            </div>
           </div>
         </div>
       )}
