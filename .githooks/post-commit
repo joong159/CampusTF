@@ -1,0 +1,4 @@
+#!/bin/sh
+# 커밋 후 자동으로 origin에 push (실패해도 커밋은 유지)
+branch=$(git rev-parse --abbrev-ref HEAD)
+git push -u origin "$branch" 2>/dev/null || git push origin "$branch" 2>/dev/null || true
