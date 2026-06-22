@@ -437,65 +437,27 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
       </div>
 
       {/* 5. Chat Input Bar */}
-      {/* 5. Chat Input Bar or Application Buttons */}
-      {isHost || myStatus === 'accepted' ? (
-        <form
-          onSubmit={handleSendMessage}
-          className="sticky bottom-0 bg-theme-header border-t border-theme-header-border p-3 flex items-center gap-2.5 z-10 transition-colors"
+      {/* 5. Chat Input Bar */}
+      <form
+        onSubmit={handleSendMessage}
+        className="sticky bottom-0 bg-theme-header border-t border-theme-header-border p-3 flex items-center gap-2.5 z-10 transition-colors"
+      >
+        <input
+          type="text"
+          value={inputValue}
+          onChange={(e) => setInputValue(e.target.value)}
+          placeholder="메시지를 입력하세요..."
+          className="flex-1 px-4 py-3 bg-theme-input border border-theme-input-border rounded-2xl text-xs focus:outline-none focus:border-theme-input-focus text-theme-text-primary placeholder-theme-text-muted/60 transition-all"
+          style={{ minHeight: '44px' }}
+        />
+        <button
+          type="submit"
+          className="w-11 h-11 bg-gradient-to-tr from-[#003893] to-blue-500 hover:scale-[1.05] active:scale-[0.9] text-white rounded-2xl flex items-center justify-center transition-all shadow-sm cursor-pointer"
+          style={{ minHeight: '40px', minWidth: '40px' }}
         >
-          <input
-            type="text"
-            value={inputValue}
-            onChange={(e) => setInputValue(e.target.value)}
-            placeholder="메시지를 입력하세요..."
-            className="flex-1 px-4 py-3 bg-theme-input border border-theme-input-border rounded-2xl text-xs focus:outline-none focus:border-theme-input-focus text-theme-text-primary placeholder-theme-text-muted/60 transition-all"
-            style={{ minHeight: '44px' }}
-          />
-          <button
-            type="submit"
-            className="w-11 h-11 bg-gradient-to-tr from-[#003893] to-blue-500 hover:scale-[1.05] active:scale-[0.9] text-white rounded-2xl flex items-center justify-center transition-all shadow-sm cursor-pointer"
-            style={{ minHeight: '40px', minWidth: '40px' }}
-          >
-            <Send size={18} />
-          </button>
-        </form>
-      ) : (
-        <div className="sticky bottom-0 bg-theme-header border-t border-theme-header-border p-4 z-10 flex flex-col gap-2 transition-colors">
-          {myStatus === 'none' && (
-            <button
-              type="button"
-              onClick={handleApply}
-              className="w-full py-3.5 bg-gradient-to-r from-[#003893] to-blue-600 hover:from-theme-blue hover:to-blue-500 text-white text-xs font-bold rounded-2xl shadow-sm transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 cursor-pointer"
-              style={{ minHeight: '48px' }}
-            >
-              🚕 이 팟에 동승 참여 신청하기
-            </button>
-          )}
-
-          {myStatus === 'pending' && (
-            <button
-              type="button"
-              disabled
-              className="w-full py-3.5 bg-amber-500/10 text-amber-500 border border-amber-500/20 text-xs font-bold rounded-2xl flex items-center justify-center gap-1.5"
-              style={{ minHeight: '48px' }}
-            >
-              <span className="w-2 h-2 rounded-full bg-amber-500 animate-ping"></span>
-              방장 참여 수락 대기 중...
-            </button>
-          )}
-
-          {myStatus === 'rejected' && (
-            <button
-              type="button"
-              disabled
-              className="w-full py-3.5 bg-red-500/10 text-red-500 border border-red-500/20 text-xs font-bold rounded-2xl"
-              style={{ minHeight: '48px' }}
-            >
-              동승 신청이 거절됨
-            </button>
-          )}
-        </div>
-      )}
+          <Send size={18} />
+        </button>
+      </form>
 
       {/* 6. Host Taxi Fare Entry Modal */}
       {isFareModalOpen && (

@@ -177,7 +177,7 @@ export default function NaverMap({ departure, destination }) {
     // Live Naver Map Simulation
     try {
       const naver = window.naver;
-      if (!naver || !mapRef.current) return;
+      if (!naver || !naver.maps || !mapRef.current) return;
 
       const startPt = pathPoints[0];
       // Create taxi marker icon
