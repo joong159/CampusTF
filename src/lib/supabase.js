@@ -8,7 +8,9 @@ export const isSupabaseConfigured = !!(
   supabaseUrl &&
   supabaseAnonKey &&
   supabaseUrl !== 'https://여기에-프로젝트-주소.supabase.co' &&
-  !supabaseUrl.includes('여기에')
+  !supabaseUrl.includes('여기에') &&
+  !supabaseAnonKey.includes('여기에') &&
+  supabaseAnonKey.startsWith('eyJ')
 );
 
 export const supabase = isSupabaseConfigured
