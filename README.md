@@ -1,30 +1,36 @@
-# 대진대 바이브코딩 스타터킷
+This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://github.com/vercel/next.js/tree/canary/packages/create-next-app).
 
-코딩 몰라도 괜찮습니다. 이 폴더를 **Cursor로 열고**, 아래 순서만 따라오세요.
+## Getting Started
 
-## 이 폴더에 뭐가 있나요?
+First, run the development server:
 
-- `.cursorrules` — Cursor(AI)에게 줄 작업 규칙. **여러분 앱에 맞게 채워 넣으세요.**
-- `.env.example` — 비밀 키를 적는 칸 (Supabase 값 등)
-- `프롬프트-치트시트.md` — 단계마다 그대로 복붙할 프롬프트 모음
-- `docs/` — **AI와 인터뷰하며 채우는 기획 문서 세트** (여기부터 시작!)
-  - `지침.md`
-  - `서비스-기획안.md`
-  - `디자인-시스템.md`
-  - `PRD.md`
-  - `유저플로우.md`
-  - `기능정의서.md`
-  - `예시-AI캠퍼스/` — 강사가 실제로 쓴 완성 예시 (막막할 때 참고)
+```bash
+npm run dev
+# or
+yarn dev
+# or
+pnpm dev
+# or
+bun dev
+```
 
-## 시작하는 법 (5단계)
+Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
 
-1. **이 폴더를 복사**해서 내 앱 이름으로 바꿉니다.
-2. **Cursor에서 폴더를 엽니다.** 그리고 이 README와 `docs/지침.md`를 먼저 읽습니다.
-3. Cursor 채팅에 `docs/` 안의 문서를 한꺼번에 첨부하거나 읽게 한 뒤, `지침.md`대로 인터뷰를 진행해달라고 합니다.
-4. AI가 질문하면 답변하고, `서비스-기획안`, `디자인-시스템`, `PRD`, `유저플로우`, `기능정의서`를 채웁니다.
-5. **GitHub에 올리고 → Vercel에서 Import**하면 배포가 시작됩니다.
+You can start editing the page by modifying `app/page.js`. The page auto-updates as you edit the file.
 
-> 문서가 먼저입니다. 문서가 정리되면 화면과 기능 구현은 한 번에 하나씩 진행하세요.
-> 막히면 에러 메시지를 그대로 복사해 Cursor에 붙이고 "이 에러 고쳐줘"라고 하세요.
+This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
-— 2026 대진대학교 바이브코딩 창업캠프
+## Learn More
+
+To learn more about Next.js, take a look at the following resources:
+
+- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
+- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
+
+You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
+
+## Deploy on Vercel
+
+The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
+
+Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
