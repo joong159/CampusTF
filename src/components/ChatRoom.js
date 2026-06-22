@@ -6,7 +6,7 @@ import { api } from '@/lib/api';
 import KakaoMap, { getCoordinates, LANDMARK_COORDS, getDisplayLocation, getRouteDetails, calculateDistance, calcTaxiFare } from '@/components/KakaoMap';
 import {
   ArrowLeft, Send, AlertTriangle, Landmark,
-  ChevronRight, Calculator, Check, Copy, ExternalLink, RefreshCw, UserCheck
+  ChevronRight, Calculator, Check, Copy, ExternalLink, RefreshCw, UserCheck, CreditCard
 } from 'lucide-react';
 
 // Haversine 거리 계산 (meter 단위)
@@ -89,6 +89,7 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
   const [midwayBoarders, setMidwayBoarders] = useState({}); // userId -> boolean
   const [guestIsMidway, setGuestIsMidway] = useState(false);
   const [applyingMidway, setApplyingMidway] = useState(false); // midway toggle on application banner
+  const [midwayLocationInput, setMidwayLocationInput] = useState('대진대 정문'); // 중간 지점 입력
 
   // Route modal state
   const [showRouteModal, setShowRouteModal] = useState(false);
@@ -185,18 +186,18 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
       return;
     }
 
-    const midwayNote = applyingMidway ? ' [중간 합류 - 대진대 정문 탑승]' : '';
+    const midwayNote = applyingMidway ? ` [중간 합류 - ${midwayLocationInput} 탑승]` : '';
     const confirmJoin = window.confirm(`이 택시 팟에 동승 참여를 신청하시겠습니까?${midwayNote}`);
     if (!confirmJoin) return;
 
     try {
-      const { error } = await api.applicants.apply(roomId, user.id);
+      const { error } = await api.applicants.apply(roomId, user.id, applyingMidway, midwayLocationInput);
       if (error) throw error;
 
       // Send automatic system message to notify host of midway boarding
       if (applyingMidway) {
         const studentId = user.user_metadata?.student_id || user.email?.split('@')[0] || '학생';
-        const systemMsg = `🙋‍♂️ 학번 ${studentId}님이 [중간 합류]로 신청했습니다 (정문 탑승).`;
+        const systemMsg = `🙋‍♂️ 학번 ${studentId}님이 [중간 합류]로 신청했습니다 (${midwayLocationInput} 탑승).`;
         await api.chats.send(roomId, user.id, systemMsg);
       }
 
@@ -428,6 +429,18 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
 
       {/* 2. Top Info Banners (Sticky) */}
       <div className="bg-theme-panel border-b border-theme-border p-3 text-xs space-y-2.5 z-5 transition-colors">
+        {/* Taxi Fare Banner - Show to all users when room has total_fare */}
+        {room && room.total_fare > 0 && (
+          <div className="bg-green-500/10 border border-green-500/30 text-green-700 rounded-2xl p-3 flex items-start gap-2 transition-colors">
+            <CreditCard size={15} className="text-green-600 shrink-0 mt-0.5" />
+            <div className="leading-normal font-semibold">
+              <p className="font-black text-green-700">💰 방장이 설정한 택시 요금</p>
+              <p className="text-sm font-bold text-green-600 mt-1">{room.total_fare.toLocaleString()}원</p>
+              <p className="text-[10px] text-green-600/80 mt-0.5">현재 인원({participantsCount}명) 기준 분담금: 약 {Math.round(room.total_fare / participantsCount / 10) * 10}원</p>
+            </div>
+          </div>
+        )}
+
         {/* Warning Banner */}
         <div className="bg-amber-500/10 border border-theme-gold/20 text-theme-gold rounded-2xl p-3 flex items-start gap-2 transition-colors">
           <AlertTriangle size={15} className="text-theme-gold shrink-0 mt-0.5 animate-pulse" />
@@ -492,11 +505,10 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
                 >
                   <div className="flex flex-col gap-0.5">
                     <span className="text-xs font-bold text-theme-text-primary">
-                      🔄 중간 합류로 신청{' '}
-                      <span className="text-theme-text-muted font-normal">(대진대 정문 탑승)</span>
+                      🔄 중간 합류로 신청
                     </span>
                     <span className="text-[10px] text-theme-text-muted">
-                      정문에서 탑승하는 중간 합류입니다. 더 낮은 요금이 적용됩니다.
+                      지정된 지점에서 탑승하는 중간 합류입니다. 더 낮은 요금이 적용됩니다.
                     </span>
                   </div>
                   <div
@@ -509,6 +521,23 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
                     />
                   </div>
                 </div>
+
+                {/* Midway location input - Only visible when toggled on */}
+                {applyingMidway && (
+                  <div className="mt-2 animate-fade-in">
+                    <label className="block text-xs font-bold text-theme-text-secondary mb-1.5 ml-1">
+                      📍 중간 지점 (탑승 위치)
+                    </label>
+                    <input
+                      type="text"
+                      value={midwayLocationInput}
+                      onChange={(e) => setMidwayLocationInput(e.target.value)}
+                      placeholder="예: 대진대 정문, 포천역, 의정부역..."
+                      className="w-full px-3 py-2.5 bg-theme-input border border-theme-input-border rounded-2xl text-xs focus:outline-none focus:border-theme-input-focus focus:bg-theme-input focus:shadow-glow-blue text-theme-text-primary placeholder-theme-text-muted/65 transition-all"
+                    />
+                    <p className="text-[10px] text-theme-text-muted mt-1 ml-1">위에서 탑승할 구체적인 위치를 입력하세요</p>
+                  </div>
+                )}
 
                 {/* Midway fare preview */}
                 {applyingMidway && room && (() => {

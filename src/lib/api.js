@@ -186,7 +186,7 @@ export const api = {
       return data || [];
     },
 
-    apply: async (roomId, userId) => {
+    apply: async (roomId, userId, isMidwayBoarding = false, midwayLocation = null) => {
       if (isMock) {
         return supabaseMock.db.applyForRoom(roomId, userId);
       }
@@ -197,6 +197,8 @@ export const api = {
           room_id: roomId,
           user_id: userId,
           status: 'pending',
+          is_midway_boarding: isMidwayBoarding,
+          midway_location: midwayLocation,
         })
         .select()
         .single();

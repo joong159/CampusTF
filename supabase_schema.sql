@@ -55,6 +55,8 @@ create table public.applicants (
   room_id uuid references public.rooms(id) on delete cascade not null,
   user_id uuid references public.profiles(id) on delete cascade not null,
   status text not null default 'pending' check (status in ('pending', 'accepted', 'rejected')),
+  is_midway_boarding boolean default false not null,
+  midway_location text,
   created_at timestamp with time zone default timezone('utc'::text, now()) not null,
   unique (room_id, user_id)
 );
