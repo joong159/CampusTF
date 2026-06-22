@@ -38,10 +38,42 @@ export const ROUTE_DATA = {
   '대진대 공학관-의정부역': { distance: '18.2km', fare: 24300 },
 };
 
+// Haversine formula — returns distance in meters
+export const calculateDistance = (lat1, lon1, lat2, lon2) => {
+  const R = 6371000; // Earth radius in meters
+  const toRad = (deg) => (deg * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLon = toRad(lon2 - lon1);
+  const a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  return R * c;
+};
+
+// Korean standard taxi fare formula (서울/경기 기준)
+export const calcTaxiFare = (distanceMeters) => {
+  const roadDist = distanceMeters * 1.25; // road routing multiplier
+  const baseFare = 4800;
+  const extraFare = Math.max(0, roadDist - 1600) / 131 * 100;
+  return Math.round((baseFare + extraFare) / 100) * 100;
+};
+
 export const getRouteDetails = (dep, dest) => {
   const depCoords = getCoordinates(dep, LANDMARK_COORDS.station);
   const destCoords = getCoordinates(dest, LANDMARK_COORDS.main_gate);
-  
+
+  // If either side is a custom coordinate (name|lat,lng), use dynamic formula
+  const depIsCustom = dep && dep.includes('|');
+  const destIsCustom = dest && dest.includes('|');
+  if (depIsCustom || destIsCustom) {
+    const distM = calculateDistance(depCoords.lat, depCoords.lng, destCoords.lat, destCoords.lng);
+    const roadDistM = distM * 1.25;
+    const fare = calcTaxiFare(distM);
+    return { distance: (roadDistM / 1000).toFixed(1) + 'km', fare };
+  }
+
   const key = `${depCoords.name}-${destCoords.name}`;
   return ROUTE_DATA[key] || { distance: '약 5.0km', fare: 8000 };
 };
@@ -49,6 +81,15 @@ export const getRouteDetails = (dep, dest) => {
 // Substring helper
 export const getCoordinates = (locationName, defaultCoords) => {
   if (!locationName) return defaultCoords;
+  
+  if (locationName.includes('|')) {
+    const [name, coords] = locationName.split('|');
+    const [lat, lng] = coords.split(',').map(Number);
+    if (!isNaN(lat) && !isNaN(lng)) {
+      return { lat, lng, name };
+    }
+  }
+  
   const name = locationName.toLowerCase();
   
   if (name.includes('정문')) return { ...LANDMARK_COORDS.main_gate, name: '대진대 정문' };
@@ -60,7 +101,12 @@ export const getCoordinates = (locationName, defaultCoords) => {
   return { ...defaultCoords, name: locationName };
 };
 
-export default function KakaoMap({ departure, destination }) {
+export const getDisplayLocation = (locationStr) => {
+  if (!locationStr) return '';
+  return locationStr.includes('|') ? locationStr.split('|')[0] : locationStr;
+};
+
+export default function KakaoMap({ departure, destination, onRouteInfoUpdate }) {
   const mapContainerRef = useRef(null);
   const leafletMapContainerRef = useRef(null);
   
@@ -111,6 +157,13 @@ export default function KakaoMap({ departure, destination }) {
           const data = await res.json();
           if (active && data.path && data.path.length > 0) {
             setRoutePath(data.path);
+            // Fire route info callback if available
+            if (onRouteInfoUpdate && (data.taxiFare || data.distance)) {
+              onRouteInfoUpdate({
+                fare: data.taxiFare,
+                distance: data.distance,
+              });
+            }
             return;
           }
         }
@@ -122,6 +175,16 @@ export default function KakaoMap({ departure, destination }) {
           { lat: depCoords.lat, lng: depCoords.lng },
           { lat: destCoords.lat, lng: destCoords.lng }
         ]);
+        // Fallback: compute from Haversine
+        if (onRouteInfoUpdate) {
+          const distM = calculateDistance(depCoords.lat, depCoords.lng, destCoords.lat, destCoords.lng);
+          const roadDistM = distM * 1.25;
+          const fare = calcTaxiFare(distM);
+          onRouteInfoUpdate({
+            fare,
+            distance: (roadDistM / 1000).toFixed(1) + 'km',
+          });
+        }
       }
     };
 

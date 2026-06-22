@@ -1,32 +1,152 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useRef, useCallback } from 'react';
 import { api } from '@/lib/api';
 import KakaoMap, { getRouteDetails, getCoordinates, LANDMARK_COORDS } from '@/components/KakaoMap';
-import { ArrowLeft, MapPin, Clock, Users, ShieldAlert, CreditCard, Link, Landmark } from 'lucide-react';
+import { ArrowLeft, MapPin, Clock, Users, ShieldAlert, CreditCard, Link, Landmark, Search, X } from 'lucide-react';
+
+// Preset locations for quick selection / fallback
+const PRESET_LOCATIONS = [
+  { name: '대진대역 1번출구', lat: 37.875184, lng: 127.156525 },
+  { name: '대진대 정문',     lat: 37.896245, lng: 127.186847 },
+  { name: '대진대 공학관',   lat: 37.899120, lng: 127.183492 },
+  { name: '포천터미널',      lat: 37.894812, lng: 127.206691 },
+  { name: '의정부역',        lat: 37.738411, lng: 127.045934 },
+];
 
 export default function CreateRoom({ user, onBack, onRoomCreated }) {
-  const [departure, setDeparture] = useState('대진대역 1번출구');
-  const [destination, setDestination] = useState('대진대 정문');
+  // --- Location state ---
+  // `departure`/`destination`: the value stored in DB. Either a preset name or "장소명|lat,lng"
+  const [departure, setDeparture]       = useState('대진대역 1번출구');
+  const [destination, setDestination]   = useState('대진대 정문');
+  // Display strings inside the text inputs
+  const [departureInput, setDepartureInput]   = useState('대진대역 1번출구');
+  const [destinationInput, setDestinationInput] = useState('대진대 정문');
+  // Suggestion lists
+  const [departureSuggestions, setDepartureSuggestions]   = useState([]);
+  const [destinationSuggestions, setDestinationSuggestions] = useState([]);
+  const [showDepSuggestions, setShowDepSuggestions]   = useState(false);
+  const [showDestSuggestions, setShowDestSuggestions] = useState(false);
+  // Async route info from KakaoMap callback
+  const [routeInfo, setRouteInfo] = useState(null);
+
+  // --- Form state ---
   const [departureTime, setDepartureTime] = useState('');
-  const [capacity, setCapacity] = useState(4);
-  const [genderFilter, setGenderFilter] = useState('anyone');
-  const [bankName, setBankName] = useState('국민은행');
+  const [capacity, setCapacity]           = useState(4);
+  const [genderFilter, setGenderFilter]   = useState('anyone');
+  const [bankName, setBankName]           = useState('국민은행');
   const [accountNumber, setAccountNumber] = useState('');
-  const [kakaopayUrl, setKakaopayUrl] = useState('');
-  const [loading, setLoading] = useState(false);
+  const [kakaopayUrl, setKakaopayUrl]     = useState('');
+  const [loading, setLoading]             = useState(false);
 
   const bankOptions = ['국민은행', '신한은행', '우리은행', '하나은행', '카카오뱅크', '토스뱅크', '농협'];
 
-  // Preset location dropdown options
-  const locations = [
-    '대진대역 1번출구',
-    '대진대 정문',
-    '대진대 공학관',
-    '포천터미널',
-    '의정부역'
-  ];
+  // Debounce refs
+  const depDebounceRef  = useRef(null);
+  const destDebounceRef = useRef(null);
 
+  // ----- Autocomplete fetcher -----
+  const fetchSuggestions = useCallback((query, isDeparture) => {
+    const setSuggestions = isDeparture ? setDepartureSuggestions : setDestinationSuggestions;
+
+    // Empty query → show preset quick-picks
+    if (!query.trim()) {
+      setSuggestions(PRESET_LOCATIONS);
+      return;
+    }
+
+    // Try Kakao Maps Places SDK first
+    if (
+      typeof window !== 'undefined' &&
+      window.kakao &&
+      window.kakao.maps &&
+      window.kakao.maps.services
+    ) {
+      const ps = new window.kakao.maps.services.Places();
+      ps.keywordSearch(query, (data, status) => {
+        if (status === window.kakao.maps.services.Status.OK) {
+          const results = data.slice(0, 6).map((item) => ({
+            name: item.place_name,
+            address: item.road_address_name || item.address_name,
+            lat: parseFloat(item.y),
+            lng: parseFloat(item.x),
+          }));
+          setSuggestions(results);
+        } else {
+          // SDK returned no results → fallback to local filter
+          const filtered = PRESET_LOCATIONS.filter((p) =>
+            p.name.includes(query)
+          );
+          setSuggestions(filtered);
+        }
+      });
+    } else {
+      // SDK not loaded → local fallback
+      const filtered = PRESET_LOCATIONS.filter((p) => p.name.includes(query));
+      setSuggestions(filtered.length > 0 ? filtered : PRESET_LOCATIONS);
+    }
+  }, []);
+
+  // ----- Input change handlers -----
+  const handleDepInput = (e) => {
+    const val = e.target.value;
+    setDepartureInput(val);
+    setShowDepSuggestions(true);
+    clearTimeout(depDebounceRef.current);
+    depDebounceRef.current = setTimeout(() => fetchSuggestions(val, true), 250);
+  };
+
+  const handleDestInput = (e) => {
+    const val = e.target.value;
+    setDestinationInput(val);
+    setShowDestSuggestions(true);
+    clearTimeout(destDebounceRef.current);
+    destDebounceRef.current = setTimeout(() => fetchSuggestions(val, false), 250);
+  };
+
+  // ----- Suggestion select -----
+  const selectDeparture = (item) => {
+    const value = item.lng
+      ? `${item.name}|${item.lat},${item.lng}`
+      : item.name;
+    // If it's a pure preset name (no custom coords needed), store just the name
+    const isPreset = PRESET_LOCATIONS.some(p => p.name === item.name);
+    setDeparture(isPreset ? item.name : value);
+    setDepartureInput(item.name);
+    setDepartureSuggestions([]);
+    setShowDepSuggestions(false);
+    setRouteInfo(null); // reset until KakaoMap fires callback
+  };
+
+  const selectDestination = (item) => {
+    const value = item.lng
+      ? `${item.name}|${item.lat},${item.lng}`
+      : item.name;
+    const isPreset = PRESET_LOCATIONS.some(p => p.name === item.name);
+    setDestination(isPreset ? item.name : value);
+    setDestinationInput(item.name);
+    setDestinationSuggestions([]);
+    setShowDestSuggestions(false);
+    setRouteInfo(null);
+  };
+
+  const clearDep = () => {
+    setDeparture('');
+    setDepartureInput('');
+    setDepartureSuggestions([]);
+    setShowDepSuggestions(false);
+    setRouteInfo(null);
+  };
+
+  const clearDest = () => {
+    setDestination('');
+    setDestinationInput('');
+    setDestinationSuggestions([]);
+    setShowDestSuggestions(false);
+    setRouteInfo(null);
+  };
+
+  // ----- Form submit -----
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!departure || !destination) {
@@ -47,7 +167,6 @@ export default function CreateRoom({ user, onBack, onRoomCreated }) {
     }
 
     setLoading(true);
-
     try {
       const roomData = {
         departure,
@@ -61,7 +180,6 @@ export default function CreateRoom({ user, onBack, onRoomCreated }) {
 
       const { data, error } = await api.rooms.create(roomData, user.id);
       if (error) throw error;
-      
       alert('택시 동승 방이 성공적으로 생성되었습니다!');
       onRoomCreated(data.id);
     } catch (err) {
@@ -70,6 +188,16 @@ export default function CreateRoom({ user, onBack, onRoomCreated }) {
       setLoading(false);
     }
   };
+
+  // ----- Computed fare for banner -----
+  const getDisplayedRouteInfo = () => {
+    if (routeInfo) return routeInfo; // async from KakaoMap (highest quality)
+    if (departure && destination && departure !== destination) {
+      return getRouteDetails(departure, destination); // sync fallback
+    }
+    return null;
+  };
+  const displayedRoute = getDisplayedRouteInfo();
 
   return (
     <div className="flex flex-col flex-1 bg-theme-emulator text-theme-text-primary transition-colors duration-300">
@@ -90,44 +218,128 @@ export default function CreateRoom({ user, onBack, onRoomCreated }) {
         {/* Route Section */}
         <div className="space-y-4">
           <h3 className="text-[10px] font-black text-theme-text-muted tracking-wider uppercase ml-1 transition-colors">📍 출발 및 도착 정보</h3>
-          
-          {/* Departure */}
+
+          {/* Departure Autocomplete */}
           <div>
             <label className="block text-xs font-bold text-theme-text-secondary mb-2 ml-1 transition-colors">출발지</label>
             <div className="relative">
               <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-theme-text-muted transition-colors pointer-events-none z-10">
                 <MapPin size={16} className="text-blue-500" />
               </span>
-              <select
-                value={departure}
-                onChange={(e) => setDeparture(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 bg-theme-input border border-theme-input-border rounded-2xl text-xs focus:outline-none focus:border-theme-input-focus focus:bg-theme-input focus:shadow-glow-blue text-theme-text-primary placeholder-theme-text-muted/65 transition-all appearance-none cursor-pointer"
+              <input
+                type="text"
+                value={departureInput}
+                onChange={handleDepInput}
+                onFocus={() => {
+                  setShowDepSuggestions(true);
+                  fetchSuggestions(departureInput, true);
+                }}
+                onBlur={() => setTimeout(() => setShowDepSuggestions(false), 180)}
+                placeholder="장소명 검색 (예: 포천, 의정부역...)"
+                className="w-full pl-10 pr-10 py-3 bg-theme-input border border-theme-input-border rounded-2xl text-xs focus:outline-none focus:border-theme-input-focus focus:bg-theme-input focus:shadow-glow-blue text-theme-text-primary placeholder-theme-text-muted/65 transition-all"
                 style={{ minHeight: '44px' }}
-              >
-                {locations.map(loc => (
-                  <option key={loc} value={loc} className="bg-theme-emulator text-theme-text-primary">{loc}</option>
-                ))}
-              </select>
+                autoComplete="off"
+              />
+              {departureInput ? (
+                <button type="button" onClick={clearDep} className="absolute inset-y-0 right-3 flex items-center text-theme-text-muted hover:text-theme-text-primary transition-colors cursor-pointer z-10">
+                  <X size={14} />
+                </button>
+              ) : (
+                <span className="absolute inset-y-0 right-3 flex items-center text-theme-text-muted pointer-events-none z-10">
+                  <Search size={14} />
+                </span>
+              )}
+
+              {/* Departure Suggestion Dropdown */}
+              {showDepSuggestions && departureSuggestions.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-theme-panel border border-theme-border rounded-2xl shadow-xl z-50 overflow-hidden animate-fade-in max-h-52 overflow-y-auto">
+                  {!departureInput && (
+                    <div className="px-3 py-2 text-[9px] font-black text-theme-text-muted uppercase tracking-wider border-b border-theme-border">
+                      🏫 자주 가는 추천 거점
+                    </div>
+                  )}
+                  {departureSuggestions.map((item, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onMouseDown={() => selectDeparture(item)}
+                      className="w-full text-left px-4 py-3 hover:bg-theme-input transition-colors border-b border-theme-border/50 last:border-none cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2">
+                        <MapPin size={12} className="text-blue-400 shrink-0" />
+                        <div>
+                          <p className="text-xs font-bold text-theme-text-primary">{item.name}</p>
+                          {item.address && (
+                            <p className="text-[10px] text-theme-text-muted mt-0.5">{item.address}</p>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
-          {/* Destination */}
+          {/* Destination Autocomplete */}
           <div>
             <label className="block text-xs font-bold text-theme-text-secondary mb-2 ml-1 transition-colors">목적지</label>
             <div className="relative">
               <span className="absolute inset-y-0 left-0 flex items-center pl-3.5 text-theme-text-muted transition-colors pointer-events-none z-10">
                 <MapPin size={16} className="text-red-500" />
               </span>
-              <select
-                value={destination}
-                onChange={(e) => setDestination(e.target.value)}
-                className="w-full pl-10 pr-4 py-3 bg-theme-input border border-theme-input-border rounded-2xl text-xs focus:outline-none focus:border-theme-input-focus focus:bg-theme-input focus:shadow-glow-blue text-theme-text-primary placeholder-theme-text-muted/65 transition-all appearance-none cursor-pointer"
+              <input
+                type="text"
+                value={destinationInput}
+                onChange={handleDestInput}
+                onFocus={() => {
+                  setShowDestSuggestions(true);
+                  fetchSuggestions(destinationInput, false);
+                }}
+                onBlur={() => setTimeout(() => setShowDestSuggestions(false), 180)}
+                placeholder="목적지 검색 (예: 의정부역, 서울역...)"
+                className="w-full pl-10 pr-10 py-3 bg-theme-input border border-theme-input-border rounded-2xl text-xs focus:outline-none focus:border-theme-input-focus focus:bg-theme-input focus:shadow-glow-blue text-theme-text-primary placeholder-theme-text-muted/65 transition-all"
                 style={{ minHeight: '44px' }}
-              >
-                {locations.map(loc => (
-                  <option key={loc} value={loc} className="bg-theme-emulator text-theme-text-primary">{loc}</option>
-                ))}
-              </select>
+                autoComplete="off"
+              />
+              {destinationInput ? (
+                <button type="button" onClick={clearDest} className="absolute inset-y-0 right-3 flex items-center text-theme-text-muted hover:text-theme-text-primary transition-colors cursor-pointer z-10">
+                  <X size={14} />
+                </button>
+              ) : (
+                <span className="absolute inset-y-0 right-3 flex items-center text-theme-text-muted pointer-events-none z-10">
+                  <Search size={14} />
+                </span>
+              )}
+
+              {/* Destination Suggestion Dropdown */}
+              {showDestSuggestions && destinationSuggestions.length > 0 && (
+                <div className="absolute top-full left-0 right-0 mt-1 bg-theme-panel border border-theme-border rounded-2xl shadow-xl z-50 overflow-hidden animate-fade-in max-h-52 overflow-y-auto">
+                  {!destinationInput && (
+                    <div className="px-3 py-2 text-[9px] font-black text-theme-text-muted uppercase tracking-wider border-b border-theme-border">
+                      🏫 자주 가는 추천 거점
+                    </div>
+                  )}
+                  {destinationSuggestions.map((item, i) => (
+                    <button
+                      key={i}
+                      type="button"
+                      onMouseDown={() => selectDestination(item)}
+                      className="w-full text-left px-4 py-3 hover:bg-theme-input transition-colors border-b border-theme-border/50 last:border-none cursor-pointer"
+                    >
+                      <div className="flex items-center gap-2">
+                        <MapPin size={12} className="text-red-400 shrink-0" />
+                        <div>
+                          <p className="text-xs font-bold text-theme-text-primary">{item.name}</p>
+                          {item.address && (
+                            <p className="text-[10px] text-theme-text-muted mt-0.5">{item.address}</p>
+                          )}
+                        </div>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
           </div>
 
@@ -135,13 +347,19 @@ export default function CreateRoom({ user, onBack, onRoomCreated }) {
           {(departure || destination) && (
             <div className="space-y-2 pt-1 animate-fade-in">
               <span className="block text-[10px] font-black text-theme-text-muted ml-1 uppercase tracking-wide transition-colors">경로 지도 프리뷰</span>
-              <KakaoMap departure={departure} destination={destination} />
+              <KakaoMap
+                departure={departure}
+                destination={destination}
+                onRouteInfoUpdate={(info) => setRouteInfo(info)}
+              />
               <button
                 type="button"
                 onClick={() => {
                   const depC = getCoordinates(departure, LANDMARK_COORDS.station);
                   const destC = getCoordinates(destination, LANDMARK_COORDS.main_gate);
-                  const url = `https://map.kakao.com/link/route/${encodeURIComponent(departure)},${depC.lat},${depC.lng},${encodeURIComponent(destination)},${destC.lat},${destC.lng}`;
+                  const depName = departureInput || departure;
+                  const destName = destinationInput || destination;
+                  const url = `https://map.kakao.com/link/route/${encodeURIComponent(depName)},${depC.lat},${depC.lng},${encodeURIComponent(destName)},${destC.lat},${destC.lng}`;
                   window.open(url, '_blank');
                 }}
                 className="w-full py-2 bg-yellow-400 hover:bg-yellow-500 text-yellow-950 text-[10px] font-bold rounded-xl flex items-center justify-center gap-1.5 transition-all cursor-pointer shadow-sm active:scale-95"
@@ -153,22 +371,27 @@ export default function CreateRoom({ user, onBack, onRoomCreated }) {
           )}
 
           {/* Pre-ride Taxi Fare & N/1 Cost Estimator Banner */}
-          {departure && destination && departure !== destination && (
+          {departure && destination && departure !== destination && displayedRoute && (
             <div className="bg-gradient-to-br from-theme-blue/15 to-purple-500/[0.04] border border-theme-blue/25 rounded-3xl p-5 shadow-sm space-y-3 animate-fade-in transition-colors">
               <div className="flex items-center gap-1.5 text-[10px] font-black text-theme-blue uppercase tracking-wider transition-colors">
                 <Landmark size={14} />
                 <span>예상 요금 및 1/N 예상액</span>
+                {routeInfo && (
+                  <span className="ml-auto text-[9px] font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                    실시간 계산
+                  </span>
+                )}
               </div>
-              
+
               <div className="flex justify-between text-xs text-theme-text-secondary font-semibold transition-colors">
-                <span>이동 거리: <strong className="text-theme-text-primary">{getRouteDetails(departure, destination).distance}</strong></span>
-                <span>예상 총 택시비: <strong className="text-theme-text-primary">{getRouteDetails(departure, destination).fare.toLocaleString()}원</strong></span>
+                <span>이동 거리: <strong className="text-theme-text-primary">{displayedRoute.distance}</strong></span>
+                <span>예상 총 택시비: <strong className="text-theme-text-primary">{displayedRoute.fare.toLocaleString()}원</strong></span>
               </div>
-              
+
               <div className="flex justify-between items-center pt-2.5 text-xs border-t border-theme-border font-semibold transition-colors">
                 <span className="text-theme-text-secondary">1인당 분담금 ({capacity}명 모집 시):</span>
                 <span className="text-base font-black text-red-500">
-                  {Math.round(getRouteDetails(departure, destination).fare / capacity).toLocaleString()}원
+                  {Math.round(displayedRoute.fare / capacity).toLocaleString()}원
                 </span>
               </div>
             </div>
@@ -256,7 +479,7 @@ export default function CreateRoom({ user, onBack, onRoomCreated }) {
         {/* Account Info for Settlement */}
         <div className="space-y-4 pt-2">
           <h3 className="text-[10px] font-black text-theme-text-muted tracking-wider uppercase ml-1 transition-colors">💳 정산/송금 정보 설정</h3>
-          
+
           <div className="grid grid-cols-3 gap-2">
             {/* Bank Select */}
             <div className="col-span-1">
@@ -272,7 +495,7 @@ export default function CreateRoom({ user, onBack, onRoomCreated }) {
                 ))}
               </select>
             </div>
-            
+
             {/* Account Number */}
             <div className="col-span-2">
               <label className="block text-xs font-bold text-theme-text-secondary mb-2 ml-1 transition-colors">계좌번호</label>

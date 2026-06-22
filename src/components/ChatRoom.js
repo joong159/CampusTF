@@ -1,12 +1,48 @@
+
 'use client';
 
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { api } from '@/lib/api';
-import KakaoMap, { getCoordinates, LANDMARK_COORDS } from '@/components/KakaoMap';
-import { 
-  ArrowLeft, Send, AlertTriangle, Landmark, 
+import KakaoMap, { getCoordinates, LANDMARK_COORDS, getDisplayLocation, getRouteDetails, calculateDistance, calcTaxiFare } from '@/components/KakaoMap';
+import {
+  ArrowLeft, Send, AlertTriangle, Landmark,
   ChevronRight, Calculator, Check, Copy, ExternalLink, RefreshCw, UserCheck
 } from 'lucide-react';
+
+// Calculate segment fares based on midway boarding
+const calculateSegmentFares = (totalFare, departure, destination, midwayBoardersCount, totalRidersCount) => {
+  const depC = getCoordinates(departure, LANDMARK_COORDS.station);
+  const destC = getCoordinates(destination, LANDMARK_COORDS.main_gate);
+  const midC = LANDMARK_COORDS.main_gate; // Midway point: 대진대 정문
+
+  // Calculate total distance between start and end
+  const totalDist = Math.sqrt(Math.pow(depC.lat - destC.lat, 2) + Math.pow(depC.lng - destC.lng, 2));
+
+  // Calculate distance from midway (Main Gate) to destination
+  const segment2Dist = Math.sqrt(Math.pow(midC.lat - destC.lat, 2) + Math.pow(midC.lng - destC.lng, 2));
+
+  // Guard: if midway is too close to start or end, or if total distance is tiny, just do a flat 50/50 distance split
+  let s2Ratio = 0.25; // Default: midway boarder rides 25% of the total distance
+  if (totalDist > 0.001 && segment2Dist < totalDist) {
+    s2Ratio = segment2Dist / totalDist;
+  }
+
+  const fare2 = totalFare * s2Ratio;
+  const fare1 = totalFare - fare2;
+
+  const numStart = totalRidersCount - midwayBoardersCount;
+  const numTotal = totalRidersCount;
+
+  const startShare = (fare1 / numStart) + (fare2 / numTotal);
+  const midwayShare = fare2 / numTotal;
+
+  return {
+    startShare: Math.round(startShare / 10) * 10, // Round to nearest 10 won
+    midwayShare: Math.round(midwayShare / 10) * 10,
+    fare1: Math.round(fare1),
+    fare2: Math.round(fare2)
+  };
+};
 
 export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
   const [room, setRoom] = useState(null);
@@ -19,7 +55,11 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
   const [copied, setCopied] = useState(false);
   const [showMap, setShowMap] = useState(true); // Default map expanded
   const [myStatus, setMyStatus] = useState('none'); // 'none', 'pending', 'accepted', 'rejected'
-  
+  const [acceptedApplicants, setAcceptedApplicants] = useState([]);
+  const [midwayBoarders, setMidwayBoarders] = useState({}); // userId -> boolean
+  const [guestIsMidway, setGuestIsMidway] = useState(false);
+  const [applyingMidway, setApplyingMidway] = useState(false); // midway toggle on application banner
+
   const chatContainerRef = useRef(null);
 
   const fetchRoomData = useCallback(async () => {
@@ -27,15 +67,19 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
       const roomsList = await api.rooms.list();
       const currentRoom = roomsList.find(r => r.id === roomId);
       setRoom(currentRoom);
-      
+
       if (currentRoom) {
         setParticipantsCount(currentRoom.participant_count);
-        
+
         const apps = await api.applicants.list(roomId);
         const myApp = apps.find(a => a.user_id === user.id);
         setMyStatus(myApp ? myApp.status : 'none');
+
+        // Fetch accepted applicants
+        const accepted = apps.filter(a => a.status === 'accepted');
+        setAcceptedApplicants(accepted);
       }
-      
+
       const msgs = await api.chats.list(roomId);
       setMessages(msgs);
     } catch (e) {
@@ -49,7 +93,7 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
     const timeout = setTimeout(() => {
       fetchRoomData();
     }, 0);
-    
+
     // Subscribe to realtime messages & room updates
     const unsubscribe = api.chats.subscribe(
       roomId,
@@ -96,24 +140,34 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
 
   const handleApply = async () => {
     if (!room) return;
-    
+
     if (room.gender_filter === 'same_gender' && room.host.gender !== user.user_metadata.gender) {
       alert(`이 방은 [동성끼리만(${room.host.gender}성)] 방이므로 참여할 수 없습니다.`);
       return;
     }
 
-    const confirmJoin = window.confirm('이 택시 팟에 동승 참여를 신청하시겠습니까?');
+    const midwayNote = applyingMidway ? ' [중간 합류 - 대진대 정문 탑승]' : '';
+    const confirmJoin = window.confirm(`이 택시 팟에 동승 참여를 신청하시겠습니까?${midwayNote}`);
     if (!confirmJoin) return;
 
     try {
       const { error } = await api.applicants.apply(roomId, user.id);
       if (error) throw error;
+
+      // Send automatic system message to notify host of midway boarding
+      if (applyingMidway) {
+        const studentId = user.user_metadata?.student_id || user.email?.split('@')[0] || '학생';
+        const systemMsg = `🙋‍♂️ 학번 ${studentId}님이 [중간 합류]로 신청했습니다 (정문 탑승).`;
+        await api.chats.send(roomId, user.id, systemMsg);
+      }
+
       alert('신청이 성공적으로 접수되었습니다! 방장의 참여 수락을 기다리는 중입니다.');
       fetchRoomData();
     } catch (err) {
       alert(err.message || '신청 중 오류가 발생했습니다.');
     }
   };
+
 
   const handleCopyAccount = () => {
     if (!room) return;
@@ -126,14 +180,19 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
     if (!room) return;
     const depC = getCoordinates(room.departure, LANDMARK_COORDS.station);
     const destC = getCoordinates(room.destination, LANDMARK_COORDS.main_gate);
-    const url = `https://map.kakao.com/link/route/${encodeURIComponent(room.departure)},${depC.lat},${depC.lng},${encodeURIComponent(room.destination)},${destC.lat},${destC.lng}`;
+    const depName = getDisplayLocation(room.departure);
+    const destName = getDisplayLocation(room.destination);
+
+    // 카카오맵 경로 안내 링크 (현재 유효한 포맷)
+    // from: 출발지, to: 도착지
+    const url = `https://map.kakao.com/link/from/${encodeURIComponent(depName)},${depC.lat},${depC.lng}/to/${encodeURIComponent(destName)},${destC.lat},${destC.lng}`;
     window.open(url, '_blank');
   };
 
   // State Management actions
   const advanceState = async () => {
     if (!room) return;
-    
+
     try {
       if (room.status === 'recruiting') {
         const confirmClose = window.confirm('모집을 마감하시겠습니까? 더 이상 신청을 받을 수 없습니다.');
@@ -157,6 +216,35 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
     }
   };
 
+  const getGuestShare = () => {
+    if (!room || !room.total_fare || !participantsCount) return 0;
+
+    // Check if we can parse from system messages
+    const systemMsg = messages.find(m => m.content && m.content.includes('방장이 정산 요청을 등록했습니다.'));
+    if (systemMsg) {
+      if (guestIsMidway) {
+        const match = systemMsg.content.match(/중간 합류 학우:\s*각\s*([\d,]+)원/);
+        if (match) return parseInt(match[1].replace(/,/g, ''));
+      } else {
+        const match = systemMsg.content.match(/처음부터 탑승 학우:\s*각\s*([\d,]+)원/) || systemMsg.content.match(/1인당 송금 요금:\s*([\d,]+)원/);
+        if (match) return parseInt(match[1].replace(/,/g, ''));
+      }
+    }
+
+    // Fallback if not found
+    return Math.round(room.total_fare / participantsCount);
+  };
+
+  const getFareBreakdown = () => {
+    const totalFare = parseInt(totalFareInput) || 0;
+    if (totalFare <= 0) return null;
+
+    const midwayCount = Object.values(midwayBoarders).filter(Boolean).length;
+    const totalCount = acceptedApplicants.length + 1; // apps + host
+
+    return calculateSegmentFares(totalFare, room.departure, room.destination, midwayCount, totalCount);
+  };
+
   const submitSettlement = async (e) => {
     e.preventDefault();
     if (!totalFareInput || parseInt(totalFareInput) <= 0) {
@@ -166,22 +254,28 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
 
     try {
       await api.rooms.updateFare(roomId, parseInt(totalFareInput), 'settlement');
-      
+
+      const midwayCount = Object.values(midwayBoarders).filter(Boolean).length;
+      const totalCount = acceptedApplicants.length + 1;
+      const breakdown = calculateSegmentFares(parseInt(totalFareInput), room.departure, room.destination, midwayCount, totalCount);
+
       // Auto send system message informing fare
-      const systemMessage = `📢 방장이 정산 요청을 등록했습니다.\n총 요금: ${parseInt(totalFareInput).toLocaleString()}원 (1인당 ${Math.round(parseInt(totalFareInput) / participantsCount).toLocaleString()}원씩)\n정산 정보는 최상단 안내판을 확인해 주세요.`;
+      let systemMessage = `📢 방장이 정산 요청을 등록했습니다.\n총 요금: ${parseInt(totalFareInput).toLocaleString()}원\n`;
+      if (midwayCount > 0) {
+        systemMessage += `- 처음부터 탑승 학우: 각 ${breakdown.startShare.toLocaleString()}원\n- 중간 합류 학우: 각 ${breakdown.midwayShare.toLocaleString()}원\n`;
+      } else {
+        systemMessage += `- 1인당 송금 요금: ${breakdown.startShare.toLocaleString()}원\n`;
+      }
+      systemMessage += `정산 계좌 정보는 최상단 안내판을 확인해 주세요.`;
+
       await api.chats.send(roomId, user.id, systemMessage);
-      
+
       setIsFareModalOpen(false);
       alert('정산 요청이 전송되었습니다. 탑승자 화면에 정산서가 고지됩니다.');
       fetchRoomData();
     } catch (err) {
       alert(err.message || '정산 실패');
     }
-  };
-
-  const calculatePerPerson = () => {
-    if (!room || !room.total_fare || !participantsCount) return 0;
-    return Math.round(room.total_fare / participantsCount);
   };
 
   if (loading && !room) {
@@ -220,9 +314,9 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
           </button>
           <div>
             <div className="flex items-center gap-1.5 font-bold transition-colors">
-              <span className="text-xs font-black text-theme-text-primary truncate max-w-[110px]">{room.departure}</span>
+              <span className="text-xs font-black text-theme-text-primary truncate max-w-[110px]">{getDisplayLocation(room.departure)}</span>
               <span className="text-[10px] text-theme-text-muted">➔</span>
-              <span className="text-xs font-black text-theme-text-primary truncate max-w-[110px]">{room.destination}</span>
+              <span className="text-xs font-black text-theme-text-primary truncate max-w-[110px]">{getDisplayLocation(room.destination)}</span>
             </div>
             <span className="text-[9px] text-theme-text-muted block font-bold transition-colors">동승 참여 인원: {participantsCount}명</span>
           </div>
@@ -278,7 +372,7 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
             </span>
             <ChevronRight size={14} className={`transform transition-transform ${showMap ? 'rotate-95' : ''}`} />
           </button>
-          
+
           {showMap && (
             <div className="p-2 bg-theme-input border-t border-theme-border animate-fade-in transition-colors space-y-2">
               <KakaoMap departure={room.departure} destination={room.destination} />
@@ -302,17 +396,76 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
                 <p className="text-xs text-theme-text-secondary leading-normal">
                   🙋‍♂️ 함께 이동하고 싶으신가요? 아래 버튼을 눌러 동승 신청을 해보세요. 방장이 수락하면 계좌가 공개됩니다.
                 </p>
+
+                {/* Midway boarding toggle */}
+                <div
+                  className={`flex items-center justify-between p-3 rounded-2xl border transition-all cursor-pointer ${applyingMidway
+                      ? 'bg-amber-500/10 border-amber-500/30'
+                      : 'bg-theme-input border-theme-input-border'
+                    }`}
+                  onClick={() => setApplyingMidway(v => !v)}
+                  role="checkbox"
+                  aria-checked={applyingMidway}
+                >
+                  <div className="flex flex-col gap-0.5">
+                    <span className="text-xs font-bold text-theme-text-primary">
+                      🔄 중간 합류로 신청{' '}
+                      <span className="text-theme-text-muted font-normal">(대진대 정문 탑승)</span>
+                    </span>
+                    <span className="text-[10px] text-theme-text-muted">
+                      정문에서 탑승하는 중간 합류입니다. 더 낮은 요금이 적용됩니다.
+                    </span>
+                  </div>
+                  <div
+                    className={`w-10 h-6 rounded-full transition-all relative shrink-0 ml-3 ${applyingMidway ? 'bg-amber-500' : 'bg-theme-border'
+                      }`}
+                  >
+                    <span
+                      className={`absolute top-1 w-4 h-4 rounded-full bg-white shadow transition-all ${applyingMidway ? 'left-5' : 'left-1'
+                        }`}
+                    />
+                  </div>
+                </div>
+
+                {/* Midway fare preview */}
+                {applyingMidway && room && (() => {
+                  const midC = LANDMARK_COORDS.main_gate;
+                  const destC = getCoordinates(room.destination, LANDMARK_COORDS.main_gate);
+                  const distM = calculateDistance(midC.lat, midC.lng, destC.lat, destC.lng);
+                  const estimatedFare = calcTaxiFare(distM);
+                  const totalRiders = participantsCount;
+                  const myShare = totalRiders > 0 ? Math.round(estimatedFare / totalRiders) : estimatedFare;
+                  return (
+                    <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-3 text-[11px] space-y-1 animate-fade-in">
+                      <p className="font-black text-amber-600">📊 중간 합류 예상 분담금 미리보기</p>
+                      <div className="flex justify-between text-theme-text-secondary">
+                        <span>정문 → {getDisplayLocation(room.destination)} 예상 요금</span>
+                        <span className="font-bold text-theme-text-primary">약 {estimatedFare.toLocaleString()}원</span>
+                      </div>
+                      <div className="flex justify-between text-theme-text-secondary border-t border-amber-500/20 pt-1">
+                        <span>인원({totalRiders}명) 분담 시 나의 예상 요금</span>
+                        <span className="font-black text-amber-600">약 {myShare.toLocaleString()}원</span>
+                      </div>
+                      <p className="text-[9px] text-amber-500/80">⚠️ 실제 미터기 요금을 기준으로 다를 수 있습니다.</p>
+                    </div>
+                  );
+                })()}
+
                 <button
                   type="button"
                   onClick={handleApply}
-                  className="w-full py-3 bg-[#003893] hover:bg-[#002a70] text-white text-xs font-bold rounded-xl shadow-md transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 cursor-pointer"
+                  className={`w-full py-3 text-white text-xs font-bold rounded-xl shadow-md transition-all active:scale-[0.98] flex items-center justify-center gap-1.5 cursor-pointer ${applyingMidway
+                      ? 'bg-amber-500 hover:bg-amber-600'
+                      : 'bg-[#003893] hover:bg-[#002a70]'
+                    }`}
                   style={{ minHeight: '40px' }}
                 >
-                  🚕 이 팟에 동승 신청하기
+                  {applyingMidway ? '🔄 중간 합류로 동승 신청하기' : '🚕 이 팟에 동승 신청하기'}
                 </button>
               </div>
             )}
-            
+
+
             {myStatus === 'pending' && (
               <div className="flex items-center justify-between text-xs font-medium text-amber-600 bg-amber-500/10 border border-amber-500/20 rounded-xl p-3 transition-colors">
                 <span className="flex items-center gap-1.5">
@@ -322,7 +475,7 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
                 <span className="text-[9px] bg-amber-500/20 px-2 py-0.5 rounded font-black uppercase">수락 대기 중</span>
               </div>
             )}
-            
+
             {myStatus === 'accepted' && (
               <div className="flex items-center justify-between text-xs font-medium text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 rounded-xl p-3 transition-colors">
                 <span className="flex items-center gap-1.5">
@@ -332,7 +485,7 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
                 <span className="text-[9px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded font-black uppercase">승인 완료</span>
               </div>
             )}
-            
+
             {myStatus === 'rejected' && (
               <div className="flex items-center justify-between text-xs font-medium text-red-500 bg-red-500/10 border border-red-500/20 rounded-xl p-3 transition-colors">
                 <span>동승 참여 신청이 거절되었습니다.</span>
@@ -351,7 +504,7 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
             </span>
             <span className="text-[9px] text-theme-text-muted font-bold transition-colors">방장 학번: {room.host.student_id}</span>
           </div>
-          
+
           {isHost || myStatus === 'accepted' ? (
             <>
               <div className="flex items-center justify-between bg-theme-input border border-theme-input-border rounded-xl p-2.5 transition-colors">
@@ -396,7 +549,36 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
               </span>
               <span className="text-[9px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded font-black uppercase tracking-wider">정산 진행 중</span>
             </div>
-            
+
+            {/* Guest Boarding Selector */}
+            {!isHost && (
+              <div className="flex justify-between items-center bg-theme-input p-2 rounded-2xl border border-theme-border text-[11px] transition-colors">
+                <span className="font-bold text-theme-text-secondary">내 탑승 위치 선택</span>
+                <div className="flex bg-theme-panel p-0.5 rounded-lg border border-theme-border">
+                  <button
+                    type="button"
+                    onClick={() => setGuestIsMidway(false)}
+                    className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all cursor-pointer ${!guestIsMidway
+                        ? 'bg-theme-blue text-white shadow-sm'
+                        : 'text-theme-text-secondary hover:text-theme-text-primary'
+                      }`}
+                  >
+                    처음부터
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setGuestIsMidway(true)}
+                    className={`px-2.5 py-1 rounded-md text-[10px] font-bold transition-all cursor-pointer ${guestIsMidway
+                        ? 'bg-amber-500 text-white shadow-sm'
+                        : 'text-theme-text-secondary hover:text-theme-text-primary'
+                      }`}
+                  >
+                    중간 합류
+                  </button>
+                </div>
+              </div>
+            )}
+
             <div className="bg-theme-input border border-theme-input-border rounded-2xl p-3.5 space-y-1.5 transition-colors">
               <div className="flex justify-between text-theme-text-secondary text-xs transition-colors">
                 <span>총 택시 요금</span>
@@ -407,8 +589,8 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
                 <span className="font-bold text-theme-text-primary">{participantsCount}명</span>
               </div>
               <div className="flex justify-between items-center pt-1">
-                <span className="font-bold text-theme-text-primary text-xs">1인당 송금 금액</span>
-                <span className="text-sm font-black text-red-500">{calculatePerPerson().toLocaleString()}원</span>
+                <span className="font-bold text-theme-text-primary text-xs">내가 송금할 금액</span>
+                <span className="text-sm font-black text-red-500">{getGuestShare().toLocaleString()}원</span>
               </div>
             </div>
           </div>
@@ -416,7 +598,7 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
       </div>
 
       {/* 4. Chat Messages Area */}
-      <div 
+      <div
         ref={chatContainerRef}
         className="flex-grow flex flex-col overflow-y-auto px-4 py-4 space-y-4 pb-20 bg-theme-panel/20 transition-colors"
       >
@@ -436,19 +618,18 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
                 <span className="text-[10px] font-bold text-theme-text-muted mb-1 px-1 transition-colors">
                   {isMe ? '나' : `학번 ${msg.sender.student_id} (${msg.sender.gender})`}
                 </span>
-                
+
                 {/* Bubble */}
                 <div
-                  className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-xs shadow-sm transition-all select-all ${
-                    isMe
+                  className={`max-w-[75%] rounded-2xl px-4 py-2.5 text-xs shadow-sm transition-all select-all ${isMe
                       ? 'bg-gradient-to-r from-[#003893] to-[#0055d2] text-white rounded-tr-none'
                       : 'bg-theme-panel border border-theme-border text-theme-text-primary rounded-tl-none'
-                  }`}
+                    }`}
                   style={{ wordBreak: 'break-all' }}
                 >
                   {msg.content}
                 </div>
-                
+
                 {/* Time */}
                 <span className="text-[9px] text-theme-text-muted mt-1 px-1 transition-colors">
                   {new Date(msg.created_at).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })}
@@ -492,7 +673,7 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
                 실제 미터기에 나온 총 택시 요금을 입력해 주세요. 인원 수에 맞춰 N분의 1 금액을 자동 청구합니다.
               </p>
             </div>
-            
+
             <form onSubmit={submitSettlement} className="space-y-4">
               <div>
                 <label className="block text-xs font-bold text-theme-text-secondary mb-2 ml-1 transition-colors">총 택시 요금</label>
@@ -512,12 +693,64 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
                 </div>
               </div>
 
-              {totalFareInput && participantsCount > 0 && (
-                <div className="bg-theme-panel p-3 rounded-2xl border border-theme-border flex justify-between items-center text-xs transition-colors">
-                  <span className="text-theme-text-secondary font-semibold transition-colors">1인당 예상 정산액:</span>
-                  <span className="font-black text-red-500 text-xs">
-                    {Math.round(parseInt(totalFareInput) / participantsCount).toLocaleString()}원
-                  </span>
+              {/* Midway Boarders selection for Host */}
+              {acceptedApplicants.length > 0 && (
+                <div className="space-y-2">
+                  <label className="block text-xs font-bold text-theme-text-secondary ml-1 transition-colors">중간 합류자 체크 (선택)</label>
+                  <div className="bg-theme-input border border-theme-input-border rounded-2xl p-3 space-y-2 transition-colors max-h-40 overflow-y-auto">
+                    {acceptedApplicants.map(app => (
+                      <div key={app.id} className="flex justify-between items-center py-1 text-xs">
+                        <span className="font-semibold text-theme-text-secondary">
+                          학번 {app.user.student_id} ({app.user.gender})
+                        </span>
+                        <div className="flex bg-theme-panel p-0.5 rounded-lg border border-theme-border">
+                          <button
+                            type="button"
+                            onClick={() => setMidwayBoarders(prev => ({ ...prev, [app.user_id]: false }))}
+                            className={`px-2 py-0.5 rounded text-[9px] font-bold transition-all cursor-pointer ${!midwayBoarders[app.user_id]
+                                ? 'bg-theme-blue text-white shadow-sm'
+                                : 'text-theme-text-secondary'
+                              }`}
+                          >
+                            처음부터
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => setMidwayBoarders(prev => ({ ...prev, [app.user_id]: true }))}
+                            className={`px-2 py-0.5 rounded text-[9px] font-bold transition-all cursor-pointer ${midwayBoarders[app.user_id]
+                                ? 'bg-amber-500 text-white shadow-sm'
+                                : 'text-theme-text-secondary'
+                              }`}
+                          >
+                            중간합류
+                          </button>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {totalFareInput && getFareBreakdown() && (
+                <div className="bg-theme-panel p-3.5 rounded-2xl border border-theme-border space-y-2 text-xs transition-colors">
+                  <div className="flex justify-between items-center text-[10px] text-theme-text-secondary pb-1 border-b border-theme-border/50">
+                    <span>정산 방식</span>
+                    <span className="font-bold text-theme-blue">거리 비례 분배</span>
+                  </div>
+                  <div className="flex justify-between items-center text-[10px] text-theme-text-secondary">
+                    <span>기본 탑승자 ({acceptedApplicants.length + 1 - Object.values(midwayBoarders).filter(Boolean).length}명) 1인당:</span>
+                    <span className="font-black text-theme-text-primary text-xs">
+                      {getFareBreakdown().startShare.toLocaleString()}원
+                    </span>
+                  </div>
+                  {Object.values(midwayBoarders).filter(Boolean).length > 0 && (
+                    <div className="flex justify-between items-center text-[10px] text-theme-text-secondary">
+                      <span>중간 합류자 ({Object.values(midwayBoarders).filter(Boolean).length}명) 1인당:</span>
+                      <span className="font-black text-amber-500 text-xs">
+                        {getFareBreakdown().midwayShare.toLocaleString()}원
+                      </span>
+                    </div>
+                  )}
                 </div>
               )}
 

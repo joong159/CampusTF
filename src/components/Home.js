@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '@/lib/api';
+import { getDisplayLocation } from '@/components/KakaoMap';
 import { 
   Search, Plus, LogOut, Navigation, MapPin, 
   Clock, Users, ArrowRight, CheckCircle2, AlertCircle, MessageCircle, Settings
@@ -318,9 +319,9 @@ export default function Home({ user, onSelectRoom, onCreateRoomClick, onLogout }
                   
                   {/* Route details */}
                   <div className="flex items-center gap-2 mb-3.5 mt-2">
-                    <span className="text-sm font-black text-theme-text-primary max-w-[120px] truncate transition-colors">{room.departure}</span>
+                    <span className="text-sm font-black text-theme-text-primary max-w-[120px] truncate transition-colors">{getDisplayLocation(room.departure)}</span>
                     <ArrowRight size={14} className="text-theme-blue" />
-                    <span className="text-sm font-black text-theme-text-primary max-w-[120px] truncate transition-colors">{room.destination}</span>
+                    <span className="text-sm font-black text-theme-text-primary max-w-[120px] truncate transition-colors">{getDisplayLocation(room.destination)}</span>
                   </div>
 
                   {/* Room Meta */}
@@ -412,9 +413,9 @@ export default function Home({ user, onSelectRoom, onCreateRoomClick, onLogout }
 
                     {/* Route Details */}
                     <div className="flex items-center gap-2 mb-4">
-                      <span className="text-base font-black text-theme-text-primary max-w-[150px] truncate transition-colors">{room.departure}</span>
+                      <span className="text-base font-black text-theme-text-primary max-w-[150px] truncate transition-colors">{getDisplayLocation(room.departure)}</span>
                       <ArrowRight size={14} className="text-theme-blue" />
-                      <span className="text-base font-black text-theme-text-primary max-w-[150px] truncate transition-colors">{room.destination}</span>
+                      <span className="text-base font-black text-theme-text-primary max-w-[150px] truncate transition-colors">{getDisplayLocation(room.destination)}</span>
                     </div>
 
                     {/* Bottom Row: metadata & actionable states */}
