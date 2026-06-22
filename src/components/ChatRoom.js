@@ -183,9 +183,9 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
     const depName = getDisplayLocation(room.departure);
     const destName = getDisplayLocation(room.destination);
 
-    // 카카오맵 경로 안내 링크 (현재 유효한 포맷)
-    // from: 출발지, to: 도착지
-    const url = `https://map.kakao.com/link/from/${encodeURIComponent(depName)},${depC.lat},${depC.lng}/to/${encodeURIComponent(destName)},${destC.lat},${destC.lng}`;
+    // 카카오맵 공식 문서 포맷: 한글 이름을 그대로 사용 (인코딩 X)
+    // 참고: https://apis.map.kakao.com/web/guide/#mapurl
+    const url = `https://map.kakao.com/link/from/${depName},${depC.lat},${depC.lng}/to/${destName},${destC.lat},${destC.lng}`;
     window.open(url, '_blank');
   };
 
