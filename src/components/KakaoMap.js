@@ -106,7 +106,7 @@ export const getDisplayLocation = (locationStr) => {
   return locationStr.includes('|') ? locationStr.split('|')[0] : locationStr;
 };
 
-export default function KakaoMap({ departure, destination, onRouteInfoUpdate }) {
+export default function KakaoMap({ departure, destination, onRouteInfoUpdate, midwayCoords }) {
   const mapContainerRef = useRef(null);
   const leafletMapContainerRef = useRef(null);
   
@@ -284,6 +284,35 @@ export default function KakaoMap({ departure, destination, onRouteInfoUpdate }) 
           map: map
         });
 
+        // Midway boarding point marker (amber - 중간 합류 탑승지)
+        if (midwayCoords) {
+          const midwayEl = document.createElement('div');
+          midwayEl.style.cssText = [
+            'background:#f59e0b',
+            'color:#fff',
+            'padding:3px 8px',
+            'border-radius:14px',
+            'border:2px solid #fff',
+            'font-size:9px',
+            'font-weight:900',
+            'box-shadow:0 2px 6px rgba(0,0,0,0.35)',
+            'white-space:nowrap',
+            'cursor:default',
+          ].join(';');
+          midwayEl.innerHTML = '🔄 중간 합류 탑승지';
+          new kakao.maps.CustomOverlay({
+            position: new kakao.maps.LatLng(midwayCoords.lat, midwayCoords.lng),
+            content: midwayEl,
+            xAnchor: 0.5,
+            yAnchor: 2.0,
+            zIndex: 5
+          }).setMap(map);
+          new kakao.maps.Marker({
+            position: new kakao.maps.LatLng(midwayCoords.lat, midwayCoords.lng),
+            map: map
+          });
+        }
+
         // Path Polyline
         const kakaoPath = routePath.map(pt => new kakao.maps.LatLng(pt.lat, pt.lng));
         const polyline = new kakao.maps.Polyline({
@@ -337,6 +366,16 @@ export default function KakaoMap({ departure, destination, onRouteInfoUpdate }) 
 
       // Destination Marker
       L.marker([destCoords.lat, destCoords.lng]).addTo(map);
+
+      // Midway boarding point marker (amber)
+      if (midwayCoords) {
+        const midwayIcon = L.divIcon({
+          html: `<div style="background:#f59e0b;color:#fff;padding:3px 8px;border-radius:14px;border:2px solid #fff;font-size:9px;font-weight:900;box-shadow:0 2px 4px rgba(0,0,0,0.3);white-space:nowrap;">🔄 중간 합류 탑승지</div>`,
+          className: '',
+          iconAnchor: [55, 10]
+        });
+        L.marker([midwayCoords.lat, midwayCoords.lng], { icon: midwayIcon }).addTo(map);
+      }
 
       // Polyline path
       const latlngs = routePath.map(pt => [pt.lat, pt.lng]);

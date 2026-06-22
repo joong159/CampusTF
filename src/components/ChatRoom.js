@@ -9,40 +9,70 @@ import {
   ChevronRight, Calculator, Check, Copy, ExternalLink, RefreshCw, UserCheck
 } from 'lucide-react';
 
-// Calculate segment fares based on midway boarding
-const calculateSegmentFares = (totalFare, departure, destination, midwayBoardersCount, totalRidersCount) => {
+// Haversine 거리 계산 (meter 단위)
+const haversineM = (lat1, lng1, lat2, lng2) => {
+  const R = 6371000;
+  const toRad = d => (d * Math.PI) / 180;
+  const dLat = toRad(lat2 - lat1);
+  const dLng = toRad(lng2 - lng1);
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(toRad(lat1)) * Math.cos(toRad(lat2)) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
+
+// 구간별 요금 계산 (정확한 Haversine 거리 기반)
+// 구조: 출발지 D → [중간 합류 탑승지 M] → 목적지 T
+// 구간요금1 (D→M): totalFare × d(D,M)/d(D,T) → numStart명이 부담
+// 구간요금2 (M→T): totalFare × d(M,T)/d(D,T) → numTotal명이 부담
+// ∴ 처음부터 탑승자 1인 = 구간1/numStart + 구간2/numTotal
+// ∴ 중간 합류자 1인   = 구간2/numTotal
+const calculateSegmentFares = (totalFare, departure, destination, midwayBoardersCount, totalRidersCount, midwayPoint) => {
   const depC = getCoordinates(departure, LANDMARK_COORDS.station);
   const destC = getCoordinates(destination, LANDMARK_COORDS.main_gate);
-  const midC = LANDMARK_COORDS.main_gate; // Midway point: 대진대 정문
+  // midwayPoint가 없으면 기본값 대진대 정문 사용
+  const midC = midwayPoint || LANDMARK_COORDS.main_gate;
 
-  // Calculate total distance between start and end
-  const totalDist = Math.sqrt(Math.pow(depC.lat - destC.lat, 2) + Math.pow(depC.lng - destC.lng, 2));
+  // 수요자 수
+  const numStart = Math.max(1, totalRidersCount - midwayBoardersCount);
+  const numTotal = Math.max(1, totalRidersCount);
 
-  // Calculate distance from midway (Main Gate) to destination
-  const segment2Dist = Math.sqrt(Math.pow(midC.lat - destC.lat, 2) + Math.pow(midC.lng - destC.lng, 2));
-
-  // Guard: if midway is too close to start or end, or if total distance is tiny, just do a flat 50/50 distance split
-  let s2Ratio = 0.25; // Default: midway boarder rides 25% of the total distance
-  if (totalDist > 0.001 && segment2Dist < totalDist) {
-    s2Ratio = segment2Dist / totalDist;
+  // 중간 합류자가 없으면 단순 N분의 1
+  if (midwayBoardersCount === 0) {
+    const share = Math.round(totalFare / numTotal / 10) * 10;
+    return {
+      startShare: share, midwayShare: 0,
+      fare1: totalFare, fare2: 0,
+      depName: depC.name || departure,
+      midName: midC.name || '대진대 정문',
+      destName: destC.name || destination,
+    };
   }
 
-  const fare2 = totalFare * s2Ratio;
-  const fare1 = totalFare - fare2;
+  // Haversine 거리 (m)
+  const distDtoT = haversineM(depC.lat, depC.lng, destC.lat, destC.lng); // 전체
+  const distDtoM = haversineM(depC.lat, depC.lng, midC.lat, midC.lng);   // 구간 1
+  const distMtoT = haversineM(midC.lat, midC.lng, destC.lat, destC.lng); // 구간 2
 
-  const numStart = totalRidersCount - midwayBoardersCount;
-  const numTotal = totalRidersCount;
+  const totalDist = distDtoT > 0 ? distDtoT : (distDtoM + distMtoT);
+  const seg1Ratio = totalDist > 0 ? Math.min(distDtoM / totalDist, 0.95) : 0.5;
+  const seg2Ratio = 1 - seg1Ratio;
+
+  const fare1 = totalFare * seg1Ratio; // 구간 1 비용
+  const fare2 = totalFare * seg2Ratio; // 구간 2 비용
 
   const startShare = (fare1 / numStart) + (fare2 / numTotal);
   const midwayShare = fare2 / numTotal;
 
   return {
-    startShare: Math.round(startShare / 10) * 10, // Round to nearest 10 won
+    startShare: Math.round(startShare / 10) * 10,
     midwayShare: Math.round(midwayShare / 10) * 10,
     fare1: Math.round(fare1),
-    fare2: Math.round(fare2)
+    fare2: Math.round(fare2),
+    depName: depC.name || departure,
+    midName: midC.name || '대진대 정문',
+    destName: destC.name || destination,
   };
 };
+
 
 export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
   const [room, setRoom] = useState(null);
@@ -343,6 +373,10 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
   }
 
   const isHost = room.created_by === user.id;
+  // 메시지에서 중간 합류자 여부 감지
+  const hasMidwayBoarders = messages.some(m => m.content?.includes('[중간 합류]'));
+  const midwayBoardingCoords = LANDMARK_COORDS.main_gate; // 현재 중간 합류지점 = 대진대 정문
+
 
   return (
     <div className="flex flex-col flex-1 bg-theme-emulator text-theme-text-primary transition-colors duration-300 relative min-h-screen">
@@ -419,7 +453,12 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
 
           {showMap && (
             <div className="p-2 bg-theme-input border-t border-theme-border animate-fade-in transition-colors space-y-2">
-              <KakaoMap departure={room.departure} destination={room.destination} />
+              <KakaoMap
+                departure={room.departure}
+                destination={room.destination}
+                midwayCoords={hasMidwayBoarders ? midwayBoardingCoords : null}
+              />
+
               <button
                 type="button"
                 onClick={openRouteModal}
@@ -623,20 +662,48 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
               </div>
             )}
 
-            <div className="bg-theme-input border border-theme-input-border rounded-2xl p-3.5 space-y-1.5 transition-colors">
+            <div className="bg-theme-input border border-theme-input-border rounded-2xl p-3.5 space-y-2 transition-colors">
+              {/* 총 요금 및 인원 */}
               <div className="flex justify-between text-theme-text-secondary text-xs transition-colors">
-                <span>총 택시 요금</span>
+                <span>총 택시 요금 (미터기 기준)</span>
                 <span className="font-bold text-theme-text-primary">{room.total_fare.toLocaleString()}원</span>
               </div>
-              <div className="flex justify-between text-theme-text-secondary text-xs pb-1.5 border-b border-theme-border transition-colors">
+              <div className="flex justify-between text-theme-text-secondary text-xs transition-colors">
                 <span>탑승 인원 (방장 포함)</span>
                 <span className="font-bold text-theme-text-primary">{participantsCount}명</span>
               </div>
-              <div className="flex justify-between items-center pt-1">
-                <span className="font-bold text-theme-text-primary text-xs">내가 송금할 금액</span>
+
+              {/* 구간별 요금 안내 (중간 합류자 있을 때) */}
+              {hasMidwayBoarders && (
+                <div className="pt-1.5 border-t border-theme-border/50 space-y-1.5">
+                  <p className="text-[9px] text-theme-text-muted font-bold uppercase tracking-wider">구간별 탑승 요금</p>
+                  <div className="flex items-center gap-1.5 text-[10px]">
+                    <span className="w-2 h-2 rounded-full bg-[#003893] shrink-0"></span>
+                    <span className="text-theme-text-secondary">처음부터 탑승: {getDisplayLocation(room.departure)} → 대진대 정문 → {getDisplayLocation(room.destination)}</span>
+                  </div>
+                  <div className="flex items-center gap-1.5 text-[10px]">
+                    <span className="w-2 h-2 rounded-full bg-amber-500 shrink-0"></span>
+                    <span className="text-theme-text-secondary">중간 합류 탑승: 대진대 정문 → {getDisplayLocation(room.destination)}</span>
+                  </div>
+                </div>
+              )}
+
+              {/* 내가 송금할 금액 */}
+              <div className="flex justify-between items-center pt-1.5 border-t border-theme-border">
+                <div>
+                  <span className="font-bold text-theme-text-primary text-xs">내가 송금할 금액</span>
+                  {!isHost && hasMidwayBoarders && (
+                    <p className="text-[9px] text-theme-text-muted mt-0.5">
+                      {guestIsMidway
+                        ? '🔄 정문 탑승 (중간 합류) 기준'
+                        : '🚕 출발지 탑승 (처음부터) 기준'}
+                    </p>
+                  )}
+                </div>
                 <span className="text-sm font-black text-red-500">{getGuestShare().toLocaleString()}원</span>
               </div>
             </div>
+
           </div>
         )}
       </div>
@@ -775,28 +842,62 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
                 </div>
               )}
 
-              {totalFareInput && getFareBreakdown() && (
-                <div className="bg-theme-panel p-3.5 rounded-2xl border border-theme-border space-y-2 text-xs transition-colors">
-                  <div className="flex justify-between items-center text-[10px] text-theme-text-secondary pb-1 border-b border-theme-border/50">
-                    <span>정산 방식</span>
-                    <span className="font-bold text-theme-blue">거리 비례 분배</span>
-                  </div>
-                  <div className="flex justify-between items-center text-[10px] text-theme-text-secondary">
-                    <span>기본 탑승자 ({acceptedApplicants.length + 1 - Object.values(midwayBoarders).filter(Boolean).length}명) 1인당:</span>
-                    <span className="font-black text-theme-text-primary text-xs">
-                      {getFareBreakdown().startShare.toLocaleString()}원
-                    </span>
-                  </div>
-                  {Object.values(midwayBoarders).filter(Boolean).length > 0 && (
-                    <div className="flex justify-between items-center text-[10px] text-theme-text-secondary">
-                      <span>중간 합류자 ({Object.values(midwayBoarders).filter(Boolean).length}명) 1인당:</span>
-                      <span className="font-black text-amber-500 text-xs">
-                        {getFareBreakdown().midwayShare.toLocaleString()}원
-                      </span>
+              {totalFareInput && getFareBreakdown() && (() => {
+                const bd = getFareBreakdown();
+                const midwayCount = Object.values(midwayBoarders).filter(Boolean).length;
+                const startCount = acceptedApplicants.length + 1 - midwayCount;
+                return (
+                  <div className="bg-theme-panel p-3.5 rounded-2xl border border-theme-border space-y-2.5 text-xs transition-colors">
+                    <div className="flex justify-between items-center text-[10px] text-theme-text-secondary pb-1 border-b border-theme-border/50">
+                      <span className="font-bold">구간별 요금 분배 (거리 비례)</span>
                     </div>
-                  )}
-                </div>
-              )}
+
+                    {midwayCount > 0 ? (
+                      <>
+                        {/* 구간 1 */}
+                        <div className="space-y-1 bg-blue-500/5 border border-blue-500/20 rounded-xl p-2.5">
+                          <p className="text-[9px] font-black text-[#003893] uppercase tracking-wide">
+                            탑승구간 1: {getDisplayLocation(room.departure)} → 대진대 정문
+                          </p>
+                          <div className="flex justify-between items-center text-[10px] text-theme-text-muted">
+                            <span>이 구간 요금 ({startCount}명 탑승)</span>
+                            <span className="font-bold text-theme-text-primary">{bd.fare1.toLocaleString()}원</span>
+                          </div>
+                        </div>
+
+                        {/* 구간 2 */}
+                        <div className="space-y-1 bg-amber-500/5 border border-amber-500/20 rounded-xl p-2.5">
+                          <p className="text-[9px] font-black text-amber-600 uppercase tracking-wide">
+                            탑승구간 2: 대진대 정문 → {getDisplayLocation(room.destination)}
+                          </p>
+                          <div className="flex justify-between items-center text-[10px] text-theme-text-muted">
+                            <span>이 구간 요금 ({acceptedApplicants.length + 1}명 탑승)</span>
+                            <span className="font-bold text-amber-600">{bd.fare2.toLocaleString()}원</span>
+                          </div>
+                        </div>
+
+                        {/* 1인당 */}
+                        <div className="pt-1 border-t border-theme-border/50 space-y-1">
+                          <div className="flex justify-between items-center">
+                            <span className="text-[10px] text-theme-text-secondary">처음부터 탑승자 ({startCount}명) 1인당:</span>
+                            <span className="font-black text-theme-text-primary">{bd.startShare.toLocaleString()}원</span>
+                          </div>
+                          <div className="flex justify-between items-center">
+                            <span className="text-[10px] text-amber-600">중간 합류자 (정문 탑승, {midwayCount}명) 1인당:</span>
+                            <span className="font-black text-amber-500">{bd.midwayShare.toLocaleString()}원</span>
+                          </div>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="flex justify-between items-center">
+                        <span className="text-[10px] text-theme-text-secondary">전체 탑승자 ({startCount}명) 1인당:</span>
+                        <span className="font-black text-theme-text-primary">{bd.startShare.toLocaleString()}원</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+
 
               <div className="flex gap-2">
                 <button
