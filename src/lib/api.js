@@ -15,19 +15,19 @@ export const api = {
   isMock,
   
   auth: {
-    signUp: async (email, password, studentId, gender) => {
+    signUp: async (email, password, studentId, gender, university = '') => {
       if (isMock) {
         return supabaseMock.auth.signUp({
           email,
           password,
-          options: { data: { student_id: studentId, gender } },
+          options: { data: { student_id: studentId, gender, university } },
         });
       }
-      
+
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: { data: { student_id: studentId, gender } },
+        options: { data: { student_id: studentId, gender, university } },
       });
       
       return { data, error };
@@ -52,6 +52,20 @@ export const api = {
       }
       const { error } = await supabase.auth.signOut();
       return { error };
+    },
+
+    signInWithOAuth: async (provider) => {
+      if (isMock) {
+        alert(`${provider} 로그인은 Supabase 연결 후 이용 가능합니다.\n현재는 이메일/비밀번호로 로그인해주세요.`);
+        return { data: null, error: new Error('mock_mode') };
+      }
+      const { data, error } = await supabase.auth.signInWithOAuth({
+        provider,
+        options: {
+          redirectTo: typeof window !== 'undefined' ? `${window.location.origin}/` : '/',
+        },
+      });
+      return { data, error };
     },
 
     getUser: async () => {
@@ -222,21 +236,57 @@ export const api = {
     },
   },
 
+  ratings: {
+    submit: async (roomId, raterId, rateeId, score) => {
+      if (isMock) {
+        return supabaseMock.db.submitRating({ room_id: roomId, rater_id: raterId, ratee_id: rateeId, score });
+      }
+      const { data, error } = await supabase
+        .from('ratings')
+        .insert({ room_id: roomId, rater_id: raterId, ratee_id: rateeId, score })
+        .select()
+        .single();
+      return { data, error };
+    },
+
+    getAverage: async (userId) => {
+      if (isMock) {
+        return supabaseMock.db.getAverageRating(userId);
+      }
+      const { data, error } = await supabase
+        .from('ratings')
+        .select('score')
+        .eq('ratee_id', userId);
+      if (error || !data?.length) return null;
+      const avg = data.reduce((sum, r) => sum + r.score, 0) / data.length;
+      return { average: Math.round(avg * 10) / 10, count: data.length };
+    },
+
+    hasRated: async (roomId, raterId, rateeId) => {
+      if (isMock) {
+        return supabaseMock.db.hasRated(roomId, raterId, rateeId);
+      }
+      const { data } = await supabase
+        .from('ratings')
+        .select('id')
+        .eq('room_id', roomId)
+        .eq('rater_id', raterId)
+        .eq('ratee_id', rateeId)
+        .maybeSingle();
+      return !!data;
+    },
+  },
+
   chats: {
     list: async (roomId) => {
       if (isMock) {
         return supabaseMock.db.getMessages(roomId);
       }
-      
       const { data, error } = await supabase
         .from('chats')
-        .select(`
-          *,
-          sender:profiles(id, student_id, gender)
-        `)
+        .select(`*, sender:profiles(id, student_id, gender)`)
         .eq('room_id', roomId)
         .order('created_at', { ascending: true });
-        
       return data || [];
     },
 
@@ -244,21 +294,14 @@ export const api = {
       if (isMock) {
         return supabaseMock.db.sendMessage(roomId, senderId, content);
       }
-      
       const { data, error } = await supabase
         .from('chats')
-        .insert({
-          room_id: roomId,
-          sender_id: senderId,
-          content,
-        })
+        .insert({ room_id: roomId, sender_id: senderId, content })
         .select()
         .single();
-        
       return { data, error };
     },
 
-    // Realtime channel subscription
     subscribe: (roomId, onNewMessage, onRoomUpdate) => {
       if (isMock) {
         // Simulating realtime by listening to the localstorage event

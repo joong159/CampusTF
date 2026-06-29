@@ -7,13 +7,14 @@ import Home from '@/components/Home';
 import CreateRoom from '@/components/CreateRoom';
 import ChatRoom from '@/components/ChatRoom';
 import ApplicantManagement from '@/components/ApplicantManagement';
+import Profile from '@/components/Profile';
 import { 
   Database, Landmark, PhoneCall, Smartphone, Sparkles, 
   Navigation, Wifi, Battery, Signal, Shield, Sun, Moon 
 } from 'lucide-react';
 
 export default function App() {
-  const [view, setView] = useState('loading'); // loading, login, home, create, chat, manage
+  const [view, setView] = useState('loading'); // loading, login, home, create, chat, manage, profile
   const [user, setUser] = useState(null);
   const [activeRoomId, setActiveRoomId] = useState(null);
   const [statusTime, setStatusTime] = useState('09:41');
@@ -92,16 +93,16 @@ export default function App() {
           <div className="space-y-4">
             <div className="inline-flex items-center gap-2 px-3 py-1.5 bg-theme-blue-light border border-theme-border text-theme-blue text-xs font-extrabold rounded-full shadow-sm transition-colors duration-300">
               <Sparkles size={14} className="text-theme-gold" />
-              <span>대진대 전용 택시 팟 매칭 서비스</span>
+              <span>누구나 쓰는 택시 동승 매칭 서비스</span>
             </div>
             <h1 className="text-4xl lg:text-5xl font-extrabold text-theme-text-primary leading-tight tracking-tight transition-colors duration-300">
-              등하교 택시비,<br />
-              <span className="bg-gradient-to-r from-theme-blue to-[#3b82f6] bg-clip-text text-transparent font-black">학우들과 1/N</span>으로<br />
+              택시비,<br />
+              <span className="bg-gradient-to-r from-theme-blue to-[#3b82f6] bg-clip-text text-transparent font-black">같이 타고 1/N</span>으로<br />
               부담 없이 가볍게!
             </h1>
             <p className="text-theme-text-secondary text-sm leading-relaxed font-semibold transition-colors duration-300">
-              <strong className="text-theme-text-primary">대진대 택시 타자</strong>는 대중교통 배차가 긴 아침 지각 위기 상황이나 비용 부담이 클 때,
-              출발지가 같은 동승자를 실시간 매칭하고, 정산 계좌 연동 및 요금 분할 UI로 편안한 통학을 돕습니다.
+              <strong className="text-theme-text-primary">위티(WeTee)</strong>는 학생이든 일반인이든 누구나 택시 동승자를 실시간으로 매칭하고,
+              정산 계좌 연동 및 요금 자동 분할로 편리한 이동을 도와주는 서비스입니다.
             </p>
           </div>
 
@@ -113,7 +114,7 @@ export default function App() {
               </div>
               <h4 className="font-bold text-theme-text-primary text-sm transition-colors duration-300">경로 기반 팟 추천</h4>
               <p className="text-xs text-theme-text-muted leading-normal font-semibold transition-colors duration-300">
-                대진대 정문, 대진대역, 포천터미널 등 목적지와 같은 방을 즉시 필터링해 줍니다.
+                출발지·목적지가 같은 방을 실시간으로 필터링해 최적의 동승자를 연결합니다.
               </p>
             </div>
             
@@ -123,7 +124,7 @@ export default function App() {
               </div>
               <h4 className="font-bold text-theme-text-primary text-sm transition-colors duration-300">동성 동승 옵션</h4>
               <p className="text-xs text-theme-text-muted leading-normal font-semibold transition-colors duration-300">
-                동성만 매칭 옵션을 지원하여 여학생 전용 / 남학생 전용으로 안전하게 탑승 가능합니다.
+                동성만 매칭 옵션을 지원하여 혼자 타기 불안할 때 안전하게 탑승할 수 있습니다.
               </p>
             </div>
 
@@ -198,11 +199,22 @@ export default function App() {
           {/* App View Area */}
           <div className="flex-1 flex flex-col overflow-y-auto bg-theme-emulator relative transition-colors duration-300">
             {view === 'loading' && (
-              <div className="flex-grow flex flex-col items-center justify-center bg-theme-emulator transition-colors">
-                <div className="w-16 h-16 bg-[#003893] dark:bg-[#3b82f6] rounded-2xl flex items-center justify-center shadow-glow-blue-strong animate-pulse mb-6">
-                  <span className="text-white text-3xl font-black">T</span>
+              <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: 'linear-gradient(145deg, #1E3A8A, #2563EB)' }}>
+                <div style={{
+                  width: '72px', height: '72px', background: '#FFFFFF',
+                  borderRadius: '22px', display: 'flex', alignItems: 'center', justifyContent: 'center',
+                  boxShadow: '0 12px 32px rgba(0,0,0,0.2)', marginBottom: '16px',
+                }}>
+                  <span style={{ color: '#1D4ED8', fontSize: '30px', fontWeight: '900', lineHeight: 1 }}>W</span>
                 </div>
-                <span className="w-6 h-6 border-2 border-theme-blue border-t-transparent rounded-full animate-spin"></span>
+                <p style={{ color: 'rgba(255,255,255,0.9)', fontSize: '18px', fontWeight: '800', margin: '0 0 4px' }}>위티</p>
+                <p style={{ color: 'rgba(255,255,255,0.5)', fontSize: '12px', fontWeight: '500', margin: '0 0 20px' }}>WeTee</p>
+                <span style={{
+                  width: '24px', height: '24px',
+                  border: '2.5px solid rgba(255,255,255,0.3)', borderTopColor: '#FFFFFF',
+                  borderRadius: '50%', display: 'inline-block',
+                  animation: 'spin 0.8s linear infinite',
+                }} />
               </div>
             )}
 
@@ -219,7 +231,14 @@ export default function App() {
                   onSelectRoom={handleSelectRoom}
                   onCreateRoomClick={() => setView('create')}
                   onLogout={handleLogout}
+                  onProfileClick={() => setView('profile')}
                 />
+              </div>
+            )}
+
+            {view === 'profile' && user && (
+              <div className="view-transition flex-1 flex flex-col">
+                <Profile user={user} onBack={() => setView('home')} />
               </div>
             )}
 

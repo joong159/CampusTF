@@ -2,216 +2,224 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { api } from '@/lib/api';
-import { ArrowLeft, User, Check, X, ShieldAlert, MessageCircle } from 'lucide-react';
+import { ArrowLeft, Check, X, MessageCircle, Users, Clock, AlertCircle } from 'lucide-react';
 
 export default function ApplicantManagement({ user, roomId, onBack, onEnterChat }) {
-  const [room, setRoom] = useState(null);
+  const [room, setRoom]           = useState(null);
   const [applicants, setApplicants] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [loading, setLoading]     = useState(true);
 
   const fetchData = useCallback(async () => {
     try {
       const roomsList = await api.rooms.list();
       const currentRoom = roomsList.find(r => r.id === roomId);
       setRoom(currentRoom);
-
       if (currentRoom) {
         const apps = await api.applicants.list(roomId);
         setApplicants(apps);
       }
-    } catch (e) {
-      console.error('Error fetching applicants:', e);
-    } finally {
-      setLoading(false);
-    }
+    } catch (e) { console.error(e); }
+    finally { setLoading(false); }
   }, [roomId]);
 
   useEffect(() => {
-    const timeout = setTimeout(() => {
-      fetchData();
-    }, 0);
-    const interval = setInterval(fetchData, 3000);
-    return () => {
-      clearTimeout(timeout);
-      clearInterval(interval);
-    };
-  }, [roomId, fetchData]);
+    const t = setTimeout(fetchData, 0);
+    const iv = setInterval(fetchData, 3000);
+    return () => { clearTimeout(t); clearInterval(iv); };
+  }, [fetchData]);
 
-  const handleStatusUpdate = async (applicantId, status) => {
-    const actionLabel = status === 'accepted' ? '수락' : '거절';
-    const confirmAction = window.confirm(`이 학생의 신청을 ${actionLabel}하시겠습니까?`);
-    if (!confirmAction) return;
-
+  const handleStatus = async (applicantId, status) => {
+    const label = status === 'accepted' ? '수락' : '거절';
+    if (!window.confirm(`이 탑승자의 신청을 ${label}하시겠습니까?`)) return;
     try {
       const { error } = await api.applicants.updateStatus(applicantId, status);
       if (error) throw error;
-      
-      // If accepted, check if capacity is reached
       if (status === 'accepted') {
-        const currentAcceptedCount = applicants.filter(a => a.status === 'accepted').length + 1; // including host
-        if (room && currentAcceptedCount + 1 >= room.capacity) {
-          // Auto close room if full
+        const newAccepted = applicants.filter(a => a.status === 'accepted').length + 1;
+        if (room && newAccepted + 1 >= room.capacity) {
           await api.rooms.updateStatus(roomId, 'closed');
         }
       }
-      
-      alert(`${actionLabel} 처리되었습니다.`);
       fetchData();
-    } catch (err) {
-      alert(err.message || '상태 업데이트에 실패했습니다.');
-    }
+    } catch (err) { alert(err.message || '상태 업데이트 실패'); }
   };
 
   if (loading && !room) {
     return (
-      <div className="flex flex-col flex-1 items-center justify-center bg-theme-emulator py-20 transition-colors">
-        <span className="w-8 h-8 border-2 border-theme-blue border-t-transparent rounded-full animate-spin mb-3"></span>
-        <span className="text-xs text-theme-text-muted font-bold transition-colors">신청자 목록 로딩 중...</span>
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#EEF2FF' }}>
+        <span style={{ width: '28px', height: '28px', border: '2.5px solid #BFDBFE', borderTopColor: '#2563EB', borderRadius: '50%', display: 'block', animation: 'spin 0.8s linear infinite', marginBottom: '12px' }} />
+        <span style={{ fontSize: '13px', color: '#9CA3AF' }}>불러오는 중...</span>
       </div>
     );
   }
 
   if (!room) {
     return (
-      <div className="flex flex-col flex-1 items-center justify-center p-6 bg-theme-emulator text-center transition-colors">
-        <ShieldAlert size={36} className="text-red-500 mb-2" />
-        <p className="text-sm font-bold text-theme-text-secondary transition-colors">방 정보를 찾을 수 없습니다.</p>
-        <button onClick={onBack} className="mt-4 px-4 py-2 bg-theme-panel border border-theme-border rounded-xl text-xs font-bold text-theme-text-secondary cursor-pointer">
-          홈으로 가기
+      <div style={{ flex: 1, display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', background: '#EEF2FF', padding: '24px', textAlign: 'center' }}>
+        <AlertCircle size={36} style={{ color: '#EF4444', marginBottom: '12px' }} />
+        <p style={{ fontSize: '14px', fontWeight: '700', color: '#4B5563' }}>방 정보를 찾을 수 없습니다.</p>
+        <button onClick={onBack} style={{ marginTop: '16px', padding: '10px 20px', background: '#F3F4F6', border: 'none', borderRadius: '12px', fontSize: '13px', fontWeight: '600', cursor: 'pointer', color: '#6B7280' }}>
+          홈으로
         </button>
       </div>
     );
   }
 
-  const acceptedCount = applicants.filter(a => a.status === 'accepted').length + 1; // plus host
-  const pendingApps = applicants.filter(a => a.status === 'pending');
-  const otherApps = applicants.filter(a => a.status !== 'pending');
+  const acceptedCount = applicants.filter(a => a.status === 'accepted').length + 1;
+  const pendingApps   = applicants.filter(a => a.status === 'pending');
+  const otherApps     = applicants.filter(a => a.status !== 'pending');
+  const isFull        = acceptedCount >= room.capacity;
 
   return (
-    <div className="flex flex-col flex-1 bg-theme-emulator text-theme-text-primary transition-colors duration-300 pb-20">
+    <div style={{ display: 'flex', flexDirection: 'column', flex: 1, background: '#EEF2FF', overflowY: 'auto', paddingBottom: '30px' }}>
+
       {/* Header */}
-      <header className="sticky top-0 bg-theme-header backdrop-blur-md border-b border-theme-header-border px-4 py-3 flex items-center justify-between z-10 shadow-sm transition-colors">
-        <div className="flex items-center gap-3">
-          <button
-            onClick={onBack}
-            className="w-9 h-9 bg-theme-panel border border-theme-border hover:bg-theme-panel/70 rounded-full flex items-center justify-center text-theme-text-secondary hover:text-theme-text-primary transition-colors cursor-pointer"
-            style={{ minHeight: '36px', minWidth: '36px' }}
-          >
+      <header style={{
+        position: 'sticky', top: 0, zIndex: 20,
+        background: '#FFFFFF', borderBottom: '1px solid #F3F4F6',
+        padding: '12px 16px', display: 'flex', alignItems: 'center', justifyContent: 'space-between',
+        boxShadow: '0 1px 8px rgba(0,0,0,0.05)',
+      }}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+          <button onClick={onBack} style={{ width: '36px', height: '36px', background: '#F3F4F6', border: 'none', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#6B7280' }}>
             <ArrowLeft size={18} />
           </button>
-          <h1 className="text-sm font-black text-theme-text-primary transition-colors">신청자 관리</h1>
+          <div>
+            <div style={{ fontSize: '15px', fontWeight: '900', color: '#111827' }}>신청자 관리</div>
+            <div style={{ fontSize: '10px', color: '#9CA3AF', marginTop: '1px' }}>{room.departure} → {room.destination}</div>
+          </div>
         </div>
-        
-        {/* Go to Chat */}
         <button
           onClick={onEnterChat}
-          className="px-3.5 py-1.5 bg-gradient-to-r from-[#003893] to-blue-600 hover:from-theme-blue hover:to-blue-500 text-white text-[10px] font-black rounded-xl flex items-center gap-1 transition-all shadow-sm cursor-pointer"
-          style={{ minHeight: '34px' }}
+          style={{ display: 'flex', alignItems: 'center', gap: '6px', padding: '8px 14px', background: '#2563EB', border: 'none', borderRadius: '12px', color: '#FFF', fontSize: '12px', fontWeight: '700', cursor: 'pointer', boxShadow: '0 2px 8px rgba(37,99,235,0.3)' }}
         >
           <MessageCircle size={14} />
           채팅방
         </button>
       </header>
 
-      {/* Room Brief Info */}
-      <div className="bg-theme-panel p-4 border-b border-theme-border shadow-sm transition-colors duration-300">
-        <span className="text-[10px] font-bold text-theme-text-muted tracking-wider uppercase block mb-1.5 transition-colors">내 모집 방 정보</span>
-        <div className="flex items-center gap-2 mb-2 font-bold">
-          <span className="text-xs font-black text-theme-text-primary truncate max-w-[150px] transition-colors">{room.departure}</span>
-          <span className="text-[10px] text-theme-text-muted">➔</span>
-          <span className="text-xs font-black text-theme-text-primary truncate max-w-[150px] transition-colors">{room.destination}</span>
+      {/* 방 정보 카드 */}
+      <div style={{ margin: '14px 14px 0', background: 'linear-gradient(135deg, #1D4ED8, #3B82F6)', borderRadius: '18px', padding: '16px', boxShadow: '0 6px 20px rgba(37,99,235,0.28)' }}>
+        <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '10px' }}>
+          <span style={{ fontSize: '10px', fontWeight: '800', color: 'rgba(255,255,255,0.7)', textTransform: 'uppercase', letterSpacing: '0.05em' }}>내 모집 방</span>
+          <span style={{
+            padding: '3px 10px', borderRadius: '20px', fontSize: '10px', fontWeight: '700',
+            background: isFull ? 'rgba(239,68,68,0.2)' : 'rgba(255,255,255,0.2)',
+            color: isFull ? '#FCA5A5' : 'rgba(255,255,255,0.9)',
+            border: `1px solid ${isFull ? 'rgba(239,68,68,0.3)' : 'rgba(255,255,255,0.3)'}`,
+          }}>
+            {isFull ? '마감' : '모집중'}
+          </span>
         </div>
-        <div className="flex justify-between items-center text-xs text-theme-text-secondary pt-1 transition-colors">
-          <span>출발 시간: <strong>{new Date(room.departure_time).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })}</strong></span>
-          <span className="font-bold">참여: <strong className="text-theme-blue">{acceptedCount} / {room.capacity}명</strong></span>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '12px' }}>
+          <span style={{ fontSize: '17px', fontWeight: '900', color: '#FFF' }}>{room.departure}</span>
+          <span style={{ color: 'rgba(255,255,255,0.5)', fontSize: '14px' }}>→</span>
+          <span style={{ fontSize: '17px', fontWeight: '900', color: '#FFF' }}>{room.destination}</span>
+        </div>
+        <div style={{ display: 'flex', gap: '16px', color: 'rgba(255,255,255,0.75)', fontSize: '12px', fontWeight: '600' }}>
+          <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <Clock size={12} />
+            {new Date(room.departure_time).toLocaleTimeString('ko-KR', { hour: '2-digit', minute: '2-digit', hour12: false })}
+          </span>
+          <span style={{ display: 'flex', alignItems: 'center', gap: '5px' }}>
+            <Users size={12} />
+            {acceptedCount} / {room.capacity}명 참여
+          </span>
+        </div>
+        {/* 인원 프로그레스 바 */}
+        <div style={{ marginTop: '10px', background: 'rgba(255,255,255,0.2)', borderRadius: '999px', height: '4px', overflow: 'hidden' }}>
+          <div style={{ height: '100%', background: isFull ? '#FCA5A5' : '#FFF', borderRadius: '999px', width: `${(acceptedCount / room.capacity) * 100}%`, transition: 'width 0.4s' }} />
         </div>
       </div>
 
-      {/* Main List */}
-      <div className="p-4 space-y-5 bg-theme-emulator transition-colors">
-        {/* 1. Pending Applicants */}
-        <div className="space-y-2">
-          <h3 className="text-[10px] font-black text-theme-text-muted tracking-wider uppercase ml-1 transition-colors">⏳ 대기 중인 신청 ({pendingApps.length})</h3>
-          
-          {pendingApps.length === 0 ? (
-            <div className="bg-theme-panel rounded-2xl p-6 text-center border border-theme-border transition-colors">
-              <p className="text-xs text-theme-text-muted font-bold transition-colors">새로운 신청자가 없습니다.</p>
-            </div>
-          ) : (
-            <div className="space-y-3">
-              {pendingApps.map((app) => (
-                <div
-                  key={app.id}
-                  className="bg-theme-panel rounded-2xl p-4 border border-theme-border shadow-sm flex items-center justify-between transition-colors"
-                >
-                  <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 bg-theme-blue-light text-theme-blue rounded-full flex items-center justify-center font-bold transition-colors">
-                      <User size={16} />
-                    </div>
-                    <div>
-                      <span className="text-sm font-bold text-theme-text-primary block transition-colors">학번: {app.user.student_id}</span>
-                      <span className="text-xs text-theme-text-secondary font-semibold transition-colors">성별: {app.user.gender}학생</span>
-                    </div>
-                  </div>
-
-                  {/* Accept / Reject Buttons */}
-                  <div className="flex gap-2">
-                    <button
-                      onClick={() => handleStatusUpdate(app.id, 'rejected')}
-                      className="w-9 h-9 bg-red-500/10 border border-red-500/15 hover:bg-red-500/20 text-red-500 rounded-xl flex items-center justify-center transition-colors cursor-pointer"
-                      style={{ minHeight: '36px', minWidth: '36px' }}
-                      title="거절"
-                    >
-                      <X size={16} />
-                    </button>
-                    <button
-                      onClick={() => handleStatusUpdate(app.id, 'accepted')}
-                      className="w-9 h-9 bg-theme-blue-light border border-theme-blue/15 hover:bg-theme-blue/20 text-theme-blue rounded-xl flex items-center justify-center transition-colors cursor-pointer"
-                      style={{ minHeight: '36px', minWidth: '36px' }}
-                      title="수락"
-                    >
-                      <Check size={16} />
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
+      {/* 대기 신청 */}
+      <div style={{ margin: '14px 14px 0' }}>
+        <div style={{ fontSize: '11px', fontWeight: '800', color: '#6B7280', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '10px' }}>
+          ⏳ 대기 중인 신청 ({pendingApps.length})
         </div>
 
-        {/* 2. Processed Applicants */}
-        {otherApps.length > 0 && (
-          <div className="space-y-2">
-            <h3 className="text-[10px] font-black text-theme-text-muted tracking-wider uppercase ml-1 transition-colors">처리된 신청 ({otherApps.length})</h3>
-            <div className="space-y-2">
-              {otherApps.map((app) => (
-                <div
-                  key={app.id}
-                  className="bg-theme-panel hover:bg-theme-panel/70 rounded-xl p-3 border border-theme-border flex items-center justify-between text-xs transition-colors"
-                >
-                  <div className="flex items-center gap-2">
-                    <div className="w-7 h-7 bg-theme-input border border-theme-input-border text-theme-text-muted rounded-full flex items-center justify-center font-bold">
-                      <User size={14} />
-                    </div>
-                    <div>
-                      <span className="font-bold text-theme-text-secondary transition-colors">학번: {app.user.student_id}</span>
-                      <span className="text-theme-text-muted ml-2">({app.user.gender})</span>
-                    </div>
+        {pendingApps.length === 0 ? (
+          <div style={{ background: '#FFF', borderRadius: '16px', padding: '32px 20px', textAlign: 'center', border: '1px solid #F3F4F6' }}>
+            <p style={{ fontSize: '13px', fontWeight: '700', color: '#9CA3AF', margin: 0 }}>새로운 신청자가 없어요</p>
+          </div>
+        ) : (
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+            {pendingApps.map(app => (
+              <div key={app.id} style={{ background: '#FFF', borderRadius: '16px', padding: '14px 14px 12px', border: '1px solid #F3F4F6', boxShadow: '0 2px 8px rgba(0,0,0,0.04)', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                  {/* 아바타 */}
+                  <div style={{ width: '44px', height: '44px', borderRadius: '14px', background: app.user.gender === '남' ? '#EFF6FF' : '#FDF2F8', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '22px' }}>
+                    {app.user.gender === '남' ? '👨' : '👩'}
                   </div>
-
                   <div>
-                    {app.status === 'accepted' ? (
-                      <span className="px-2 py-0.5 bg-emerald-500/10 border border-emerald-500/20 text-emerald-500 rounded-md font-bold">수락됨</span>
-                    ) : (
-                      <span className="px-2 py-0.5 bg-red-500/10 border border-red-500/20 text-red-500 rounded-md font-bold">거절됨</span>
+                    <div style={{ fontSize: '14px', fontWeight: '700', color: '#111827', marginBottom: '2px' }}>{app.user.student_id}</div>
+                    <div style={{ display: 'flex', gap: '6px', alignItems: 'center' }}>
+                      <span style={{ fontSize: '11px', color: '#6B7280', fontWeight: '500' }}>{app.user.gender}성</span>
+                      {app.is_midway && (
+                        <span style={{ fontSize: '10px', padding: '1px 6px', background: '#FFFBEB', color: '#D97706', border: '1px solid #FDE68A', borderRadius: '8px', fontWeight: '700' }}>
+                          경유 탑승
+                        </span>
+                      )}
+                    </div>
+                    {app.is_midway && app.midway_location && (
+                      <div style={{ fontSize: '10px', color: '#D97706', marginTop: '2px', fontWeight: '600' }}>📍 {app.midway_location}</div>
                     )}
                   </div>
                 </div>
-              ))}
-            </div>
+
+                {/* 수락/거절 버튼 */}
+                <div style={{ display: 'flex', gap: '8px' }}>
+                  <button
+                    onClick={() => handleStatus(app.id, 'rejected')}
+                    style={{ width: '40px', height: '40px', background: '#FEF2F2', border: '1px solid #FECACA', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#EF4444', transition: 'all 0.15s' }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#FEE2E2'}
+                    onMouseLeave={e => e.currentTarget.style.background = '#FEF2F2'}
+                  >
+                    <X size={16} />
+                  </button>
+                  <button
+                    onClick={() => handleStatus(app.id, 'accepted')}
+                    style={{ width: '40px', height: '40px', background: '#EFF6FF', border: '1px solid #BFDBFE', borderRadius: '12px', display: 'flex', alignItems: 'center', justifyContent: 'center', cursor: 'pointer', color: '#2563EB', transition: 'all 0.15s' }}
+                    onMouseEnter={e => e.currentTarget.style.background = '#DBEAFE'}
+                    onMouseLeave={e => e.currentTarget.style.background = '#EFF6FF'}
+                  >
+                    <Check size={16} />
+                  </button>
+                </div>
+              </div>
+            ))}
           </div>
         )}
       </div>
+
+      {/* 처리된 신청 */}
+      {otherApps.length > 0 && (
+        <div style={{ margin: '14px 14px 0' }}>
+          <div style={{ fontSize: '11px', fontWeight: '800', color: '#6B7280', letterSpacing: '0.06em', textTransform: 'uppercase', marginBottom: '10px' }}>
+            처리된 신청 ({otherApps.length})
+          </div>
+          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+            {otherApps.map(app => (
+              <div key={app.id} style={{ background: '#FFF', borderRadius: '14px', padding: '12px 14px', border: '1px solid #F3F4F6', display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
+                <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                  <div style={{ width: '36px', height: '36px', borderRadius: '10px', background: '#F9FAFB', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '16px' }}>
+                    {app.user.gender === '남' ? '👨' : '👩'}
+                  </div>
+                  <div>
+                    <span style={{ fontSize: '13px', fontWeight: '600', color: '#4B5563' }}>{app.user.student_id}</span>
+                    {app.is_midway && <span style={{ marginLeft: '6px', fontSize: '10px', color: '#D97706' }}>경유</span>}
+                  </div>
+                </div>
+                {app.status === 'accepted' ? (
+                  <span style={{ padding: '4px 10px', background: '#ECFDF5', border: '1px solid #A7F3D0', color: '#059669', borderRadius: '8px', fontSize: '11px', fontWeight: '700' }}>수락됨</span>
+                ) : (
+                  <span style={{ padding: '4px 10px', background: '#FEF2F2', border: '1px solid #FECACA', color: '#EF4444', borderRadius: '8px', fontSize: '11px', fontWeight: '700' }}>거절됨</span>
+                )}
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   );
 }

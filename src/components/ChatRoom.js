@@ -6,8 +6,25 @@ import { api } from '@/lib/api';
 import KakaoMap, { getCoordinates, LANDMARK_COORDS, getDisplayLocation, getRouteDetails, calculateDistance, calcTaxiFare } from '@/components/KakaoMap';
 import {
   ArrowLeft, Send, AlertTriangle, Landmark,
-  ChevronRight, Calculator, Check, Copy, ExternalLink, RefreshCw, UserCheck, CreditCard
+  ChevronRight, Calculator, Check, Copy, ExternalLink, RefreshCw, UserCheck, CreditCard, Star
 } from 'lucide-react';
+
+// 토스 은행 코드 매핑
+const TOSS_BANK_CODES = {
+  '국민은행': '004', '신한은행': '088', '우리은행': '020',
+  '하나은행': '081', '기업은행': '003', '농협': '011',
+  '농협은행': '011', '카카오뱅크': '090', '토스뱅크': '092', '케이뱅크': '089',
+};
+
+const generateTossLink = (bankAccount, amount) => {
+  if (!bankAccount) return null;
+  const [bankName, rawAccount] = bankAccount.split(' ');
+  const bankCode = TOSS_BANK_CODES[bankName];
+  const accountNo = rawAccount?.replace(/-/g, '');
+  if (!bankCode || !accountNo) return null;
+  const amountParam = amount > 0 ? `&amount=${amount}` : '';
+  return `supertoss://send?bank=${bankCode}&accountNo=${accountNo}${amountParam}`;
+};
 
 // Haversine 거리 계산 (meter 단위)
 const haversineM = (lat1, lng1, lat2, lng2) => {
@@ -90,11 +107,17 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
   const [midwayBoarders, setMidwayBoarders] = useState({}); // userId -> boolean
   const [guestIsMidway, setGuestIsMidway] = useState(false);
   const [applyingMidway, setApplyingMidway] = useState(false); // midway toggle on application banner
-  const [midwayLocationInput, setMidwayLocationInput] = useState('대진대 정문'); // 중간 지점 입력
+  const [midwayLocationInput, setMidwayLocationInput] = useState(''); // 중간 지점 입력
   const [midwayLocationCoords, setMidwayLocationCoords] = useState(LANDMARK_COORDS.main_gate); // 중간 지점 좌표
   const [midwayLocationSuggestions, setMidwayLocationSuggestions] = useState([]); // 중간 지점 검색 결과
   const [showMidwaySuggestions, setShowMidwaySuggestions] = useState(false); // 드롭다운 표시 여부
   const midwayDebounceRef = useRef(null); // 디바운스 처리
+
+  // Rating modal state
+  const [showRatingModal, setShowRatingModal] = useState(false);
+  const [ratingScores, setRatingScores] = useState({}); // userId -> score (1-5)
+  const [ratingSubmitted, setRatingSubmitted] = useState(false);
+  const [ratingHoverMap, setRatingHoverMap] = useState({}); // userId -> hover star
 
   // Route modal state
   const [showRouteModal, setShowRouteModal] = useState(false);
@@ -104,6 +127,16 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
   const [destSearchInput, setDestSearchInput] = useState('');
   const [depResults, setDepResults] = useState([]);
   const [destResults, setDestResults] = useState([]);
+
+  // Big map modal
+  const [showBigMapModal, setShowBigMapModal] = useState(false);
+
+  // Midway destination (alighting point)
+  const [midwayDestInput, setMidwayDestInput] = useState('');
+  const [midwayDestCoords, setMidwayDestCoords] = useState(null);
+  const [midwayDestSuggestions, setMidwayDestSuggestions] = useState([]);
+  const [showMidwayDestSuggestions, setShowMidwayDestSuggestions] = useState(false);
+  const midwayDestDebounceRef = useRef(null);
 
   const chatContainerRef = useRef(null);
 
@@ -273,9 +306,36 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
   // 중간 지점 제안된 위치 선택
   const selectMidwayLocation = (item) => {
     setMidwayLocationInput(item.name);
-    setMidwayLocationCoords({ lat: item.lat, lng: item.lng }); // 좌표 저장
+    setMidwayLocationCoords({ lat: item.lat, lng: item.lng });
     setMidwayLocationSuggestions([]);
     setShowMidwaySuggestions(false);
+  };
+
+  // 하차 위치 입력 핸들러
+  const handleMidwayDestInput = (e) => {
+    const val = e.target.value;
+    setMidwayDestInput(val);
+    setShowMidwayDestSuggestions(true);
+    clearTimeout(midwayDestDebounceRef.current);
+    midwayDestDebounceRef.current = setTimeout(() => {
+      searchKakaoPlaces(val, setMidwayDestSuggestions);
+    }, 250);
+  };
+
+  const selectMidwayDest = (item) => {
+    setMidwayDestInput(item.name);
+    setMidwayDestCoords({ lat: item.lat, lng: item.lng });
+    setMidwayDestSuggestions([]);
+    setShowMidwayDestSuggestions(false);
+  };
+
+  // 중간 합류 토글 (토글 시 하차 위치 기본값 초기화)
+  const toggleMidway = () => {
+    if (!applyingMidway && room && !midwayDestInput) {
+      setMidwayDestInput(getDisplayLocation(room.destination));
+      setMidwayDestCoords(getCoordinates(room.destination, LANDMARK_COORDS.main_gate));
+    }
+    setApplyingMidway(v => !v);
   };
 
   // 카카오맵 공식 URL 포맷으로 경로 열기
@@ -360,7 +420,7 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
       // Auto send system message informing fare
       let systemMessage = `📢 방장이 정산 요청을 등록했습니다.\n총 요금: ${parseInt(totalFareInput).toLocaleString()}원\n`;
       if (midwayCount > 0) {
-        systemMessage += `- 처음부터 탑승 학우: 각 ${breakdown.startShare.toLocaleString()}원\n- 중간 합류 학우: 각 ${breakdown.midwayShare.toLocaleString()}원\n`;
+        systemMessage += `- 처음부터 탑승: 각 ${breakdown.startShare.toLocaleString()}원\n- 중간 합류: 각 ${breakdown.midwayShare.toLocaleString()}원\n`;
       } else {
         systemMessage += `- 1인당 송금 요금: ${breakdown.startShare.toLocaleString()}원\n`;
       }
@@ -495,11 +555,11 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
 
               <button
                 type="button"
-                onClick={openRouteModal}
+                onClick={() => setShowBigMapModal(true)}
                 className="w-full py-1.5 bg-yellow-400 hover:bg-yellow-500 text-yellow-950 text-[11px] font-bold rounded-lg flex items-center justify-center gap-1 shadow-sm active:scale-[0.98] transition-all cursor-pointer"
                 style={{ minHeight: '30px' }}
               >
-                🚕 경로 확인
+                🔍 지도 크게 보기
               </button>
             </div>
           )}
@@ -520,7 +580,7 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
                       ? 'bg-amber-500/10 border-amber-500/30'
                       : 'bg-theme-input border-theme-input-border'
                     }`}
-                  onClick={() => setApplyingMidway(v => !v)}
+                  onClick={toggleMidway}
                   role="checkbox"
                   aria-checked={applyingMidway}
                 >
@@ -545,42 +605,84 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
 
                 {/* Midway location input - Only visible when toggled on */}
                 {applyingMidway && (
-                  <div className="mt-2 animate-fade-in">
+                  <div className="mt-2 animate-fade-in flex flex-col gap-2">
+                    {/* ① 탑승 위치 */}
+                    <div>
+                      <label className="block text-xs font-bold text-theme-text-secondary mb-1.5 ml-1">
+                        📍 탑승 위치 (내 출발지)
+                      </label>
+                      <div className="relative">
+                        <input
+                          type="text"
+                          value={midwayLocationInput}
+                          onChange={handleMidwayLocationInput}
+                          onFocus={() => {
+                            setShowMidwaySuggestions(true);
+                            searchKakaoPlaces(midwayLocationInput, setMidwayLocationSuggestions);
+                          }}
+                          onBlur={() => setTimeout(() => setShowMidwaySuggestions(false), 180)}
+                          placeholder="예: 강남역, 홍대입구, 건대입구..."
+                          className="w-full px-3 py-2.5 bg-theme-input border border-theme-input-border rounded-2xl text-xs focus:outline-none focus:border-theme-input-focus focus:bg-theme-input focus:shadow-glow-blue text-theme-text-primary placeholder-theme-text-muted/65 transition-all"
+                          autoComplete="off"
+                        />
+                        {showMidwaySuggestions && midwayLocationSuggestions.length > 0 && (
+                          <div className="absolute top-full left-0 right-0 mt-1 bg-theme-panel border border-theme-border rounded-2xl shadow-xl z-50 overflow-hidden animate-fade-in max-h-48 overflow-y-auto">
+                            {midwayLocationSuggestions.map((item, i) => (
+                              <button
+                                key={i}
+                                type="button"
+                                onMouseDown={() => selectMidwayLocation(item)}
+                                className="w-full text-left px-4 py-2.5 hover:bg-theme-input transition-colors border-b border-theme-border/50 last:border-none cursor-pointer"
+                              >
+                                <div className="flex items-start gap-2">
+                                  <span className="text-amber-500 shrink-0 mt-0.5">📍</span>
+                                  <div className="min-w-0">
+                                    <p className="text-xs font-bold text-theme-text-primary truncate">{item.name}</p>
+                                    {item.address && (
+                                      <p className="text-[10px] text-theme-text-muted mt-0.5 truncate">{item.address}</p>
+                                    )}
+                                  </div>
+                                </div>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* ② 하차 위치 */}
+                    <div className="mt-2 animate-fade-in">
                     <label className="block text-xs font-bold text-theme-text-secondary mb-1.5 ml-1">
-                      📍 중간 지점 (탑승 위치)
+                      🏁 하차 위치 (도착지)
                     </label>
                     <div className="relative">
                       <input
                         type="text"
-                        value={midwayLocationInput}
-                        onChange={handleMidwayLocationInput}
+                        value={midwayDestInput}
+                        onChange={handleMidwayDestInput}
                         onFocus={() => {
-                          setShowMidwaySuggestions(true);
-                          searchKakaoPlaces(midwayLocationInput, setMidwayLocationSuggestions);
+                          setShowMidwayDestSuggestions(true);
+                          searchKakaoPlaces(midwayDestInput, setMidwayDestSuggestions);
                         }}
-                        onBlur={() => setTimeout(() => setShowMidwaySuggestions(false), 180)}
-                        placeholder="예: 대진대 정문, 포천역, 의정부역..."
+                        onBlur={() => setTimeout(() => setShowMidwayDestSuggestions(false), 180)}
+                        placeholder={room ? `기본: ${getDisplayLocation(room.destination)}` : '하차 위치 입력'}
                         className="w-full px-3 py-2.5 bg-theme-input border border-theme-input-border rounded-2xl text-xs focus:outline-none focus:border-theme-input-focus focus:bg-theme-input focus:shadow-glow-blue text-theme-text-primary placeholder-theme-text-muted/65 transition-all"
                         autoComplete="off"
                       />
-                      
-                      {/* Midway location suggestions dropdown */}
-                      {showMidwaySuggestions && midwayLocationSuggestions.length > 0 && (
-                        <div className="absolute top-full left-0 right-0 mt-1 bg-theme-panel border border-theme-border rounded-2xl shadow-xl z-50 overflow-hidden animate-fade-in max-h-48 overflow-y-auto">
-                          {midwayLocationSuggestions.map((item, i) => (
+                      {showMidwayDestSuggestions && midwayDestSuggestions.length > 0 && (
+                        <div className="absolute top-full left-0 right-0 mt-1 bg-theme-panel border border-theme-border rounded-2xl shadow-xl z-50 overflow-hidden animate-fade-in max-h-40 overflow-y-auto">
+                          {midwayDestSuggestions.map((item, i) => (
                             <button
                               key={i}
                               type="button"
-                              onMouseDown={() => selectMidwayLocation(item)}
+                              onMouseDown={() => selectMidwayDest(item)}
                               className="w-full text-left px-4 py-2.5 hover:bg-theme-input transition-colors border-b border-theme-border/50 last:border-none cursor-pointer"
                             >
                               <div className="flex items-start gap-2">
-                                <span className="text-amber-500 shrink-0 mt-0.5">📍</span>
+                                <span className="text-red-400 shrink-0 mt-0.5">🏁</span>
                                 <div className="min-w-0">
                                   <p className="text-xs font-bold text-theme-text-primary truncate">{item.name}</p>
-                                  {item.address && (
-                                    <p className="text-[10px] text-theme-text-muted mt-0.5 truncate">{item.address}</p>
-                                  )}
+                                  {item.address && <p className="text-[10px] text-theme-text-muted mt-0.5 truncate">{item.address}</p>}
                                 </div>
                               </div>
                             </button>
@@ -588,30 +690,38 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
                         </div>
                       )}
                     </div>
-                    <p className="text-[10px] text-theme-text-muted mt-1 ml-1">🔍 카카오맵에서 검색된 위치를 선택하거나 직접 입력하세요</p>
                   </div>
+                </div>
                 )}
 
                 {/* Midway fare preview */}
-                {applyingMidway && room && (() => {
-                  const midC = midwayLocationCoords; // 사용자가 선택한 중간 지점 좌표
-                  const destC = getCoordinates(room.destination, LANDMARK_COORDS.main_gate);
+                {applyingMidway && room && midwayLocationInput && (() => {
+                  const midC = midwayLocationCoords;
+                  const destC = midwayDestCoords || getCoordinates(room.destination, LANDMARK_COORDS.main_gate);
+                  const destLabel = midwayDestInput || getDisplayLocation(room.destination);
                   const distM = calculateDistance(midC.lat, midC.lng, destC.lat, destC.lng);
                   const estimatedFare = calcTaxiFare(distM);
                   const totalRiders = participantsCount;
-                  const myShare = totalRiders > 0 ? Math.round(estimatedFare / totalRiders) : estimatedFare;
+                  const myShare = totalRiders > 0 ? Math.round(estimatedFare / totalRiders / 10) * 10 : estimatedFare;
                   return (
-                    <div className="bg-amber-500/10 border border-amber-500/20 rounded-2xl p-3 text-[11px] space-y-1 animate-fade-in">
-                      <p className="font-black text-amber-600">📊 중간 합류 예상 분담금 미리보기</p>
-                      <div className="flex justify-between text-theme-text-secondary">
-                        <span>{midwayLocationInput} → {getDisplayLocation(room.destination)} 예상 요금</span>
-                        <span className="font-bold text-theme-text-primary">약 {estimatedFare.toLocaleString()}원</span>
+                    <div style={{ background: 'linear-gradient(135deg, #FFFBEB, #FEF3C7)', border: '1.5px solid #F59E0B', borderRadius: '16px', padding: '14px', display: 'flex', flexDirection: 'column', gap: '8px' }}>
+                      <div style={{ fontSize: '11px', fontWeight: '800', color: '#92400E' }}>💰 예상 요금 미리보기</div>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '6px', fontSize: '12px', fontWeight: '700', color: '#78350F' }}>
+                        <span style={{ background: '#FDE68A', padding: '2px 8px', borderRadius: '8px' }}>{midwayLocationInput}</span>
+                        <span style={{ color: '#D97706' }}>→</span>
+                        <span style={{ background: '#FDE68A', padding: '2px 8px', borderRadius: '8px' }}>{destLabel}</span>
                       </div>
-                      <div className="flex justify-between text-theme-text-secondary border-t border-amber-500/20 pt-1">
-                        <span>인원({totalRiders}명) 분담 시 나의 예상 요금</span>
-                        <span className="font-black text-amber-600">약 {myShare.toLocaleString()}원</span>
+                      <div style={{ borderTop: '1px solid #FDE68A', paddingTop: '8px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <div>
+                          <div style={{ fontSize: '10px', color: '#92400E', fontWeight: '600' }}>구간 예상 요금 (약 {(distM / 1000).toFixed(1)}km)</div>
+                          <div style={{ fontSize: '11px', color: '#78350F', fontWeight: '700' }}>총 {estimatedFare.toLocaleString()}원 ÷ {totalRiders}명</div>
+                        </div>
+                        <div style={{ textAlign: 'right' }}>
+                          <div style={{ fontSize: '10px', color: '#92400E', fontWeight: '600' }}>내 분담 예상금</div>
+                          <div style={{ fontSize: '20px', fontWeight: '900', color: '#D97706', lineHeight: 1 }}>약 {myShare.toLocaleString()}원</div>
+                        </div>
                       </div>
-                      <p className="text-[9px] text-amber-500/80">⚠️ 실제 미터기 요금을 기준으로 다를 수 있습니다.</p>
+                      <div style={{ fontSize: '9px', color: '#B45309' }}>⚠️ 실제 미터기 요금 기준으로 달라질 수 있습니다</div>
                     </div>
                   );
                 })()}
@@ -693,18 +803,41 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
                     </button>
                   </div>
 
-                  {room.kakaopay_url && (
-                    <a
-                      href={room.kakaopay_url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-full py-2 bg-yellow-400 hover:bg-yellow-500 text-yellow-955 text-xs font-bold rounded-xl flex items-center justify-center gap-1 transition-colors shadow-sm"
-                      style={{ minHeight: '36px' }}
-                    >
-                      <ExternalLink size={13} />
-                      카카오페이 빠른 송금
-                    </a>
-                  )}
+                  {/* 빠른 송금 버튼들 */}
+                  <div className="flex gap-2">
+                    {room.kakaopay_url && (
+                      <a
+                        href={room.kakaopay_url}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 py-2 bg-yellow-400 hover:bg-yellow-500 text-yellow-950 text-xs font-bold rounded-xl flex items-center justify-center gap-1 transition-colors shadow-sm"
+                        style={{ minHeight: '36px' }}
+                      >
+                        <ExternalLink size={13} />
+                        카카오페이
+                      </a>
+                    )}
+                    {(() => {
+                      const myShare = room.status === 'settlement' ? getGuestShare() : 0;
+                      const tossLink = generateTossLink(room.bank_account, myShare);
+                      return tossLink ? (
+                        <a
+                          href={tossLink}
+                          className="flex-1 py-2 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-1 transition-colors shadow-sm"
+                          style={{ minHeight: '36px', background: '#1259FF' }}
+                          onClick={(e) => {
+                            // 앱이 없으면 토스 다운로드 페이지로
+                            setTimeout(() => {
+                              window.location.href = 'https://toss.im/download';
+                            }, 1500);
+                          }}
+                        >
+                          <ExternalLink size={13} />
+                          토스로 송금
+                        </a>
+                      ) : null;
+                    })()}
+                  </div>
                 </>
               ) : (
                 <div className="bg-theme-input border border-dashed border-theme-border rounded-xl p-3.5 text-center text-theme-text-muted text-xs flex items-center justify-center gap-1.5 font-medium transition-colors">
@@ -797,6 +930,24 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
               </div>
             </div>
 
+            {/* 정산 완료 & 평가하기 버튼 */}
+            {!ratingSubmitted ? (
+              <button
+                type="button"
+                onClick={() => setShowRatingModal(true)}
+                className="w-full py-3 text-white text-xs font-bold rounded-xl flex items-center justify-center gap-2 transition-all active:scale-[0.98] cursor-pointer shadow-md"
+                style={{ background: 'linear-gradient(135deg, #7C3AED, #9333EA)', minHeight: '44px' }}
+              >
+                <Star size={15} fill="white" />
+                송금 완료 후 동승자 평가하기
+              </button>
+            ) : (
+              <div className="w-full py-3 bg-emerald-500/10 border border-emerald-500/20 text-emerald-600 text-xs font-bold rounded-xl flex items-center justify-center gap-2">
+                <Check size={15} />
+                평가가 완료되었습니다! 감사합니다 🎉
+              </div>
+            )}
+
           </div>
         )}
       </div>
@@ -866,7 +1017,172 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
         </button>
       </form>
 
-      {/* 6. Host Taxi Fare Entry Modal */}
+      {/* 6-0. 큰 지도 모달 */}
+      {showBigMapModal && room && (
+        <div
+          style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.65)', backdropFilter: 'blur(6px)', display: 'flex', flexDirection: 'column', justifyContent: 'flex-end', zIndex: 60 }}
+          onClick={e => { if (e.target === e.currentTarget) setShowBigMapModal(false); }}
+        >
+          <div style={{ background: '#FFF', borderRadius: '24px 24px 0 0', padding: '0 0 24px', display: 'flex', flexDirection: 'column', maxHeight: '90vh' }}>
+            {/* 드래그 핸들 */}
+            <div style={{ display: 'flex', justifyContent: 'center', padding: '10px 0 4px' }}>
+              <div style={{ width: '40px', height: '4px', background: '#E5E7EB', borderRadius: '4px' }} />
+            </div>
+
+            {/* 헤더 */}
+            <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '8px 20px 12px' }}>
+              <div>
+                <div style={{ fontSize: '15px', fontWeight: '800', color: '#111827' }}>🗺️ 경로 지도</div>
+                <div style={{ fontSize: '11px', color: '#6B7280', fontWeight: '600', marginTop: '2px' }}>
+                  {getDisplayLocation(room.departure)} → {getDisplayLocation(room.destination)}
+                </div>
+              </div>
+              <button
+                onClick={() => setShowBigMapModal(false)}
+                style={{ width: '32px', height: '32px', background: '#F3F4F6', border: 'none', borderRadius: '10px', fontSize: '16px', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', color: '#6B7280' }}
+              >
+                ✕
+              </button>
+            </div>
+
+            {/* 큰 지도 */}
+            <div style={{ padding: '0 12px' }}>
+              <KakaoMap
+                departure={room.departure}
+                destination={room.destination}
+                midwayCoords={hasMidwayBoarders ? midwayBoardingCoords : null}
+                mapHeight="h-72"
+              />
+            </div>
+
+            {/* 버튼 */}
+            <div style={{ display: 'flex', gap: '10px', padding: '12px 12px 0' }}>
+              <button
+                onClick={() => setShowBigMapModal(false)}
+                style={{ flex: 1, height: '46px', background: '#F3F4F6', border: 'none', borderRadius: '14px', fontSize: '13px', fontWeight: '700', color: '#6B7280', cursor: 'pointer' }}
+              >
+                닫기
+              </button>
+              <button
+                onClick={() => {
+                  const depC = getCoordinates(room.departure, LANDMARK_COORDS.station);
+                  const destC = getCoordinates(room.destination, LANDMARK_COORDS.main_gate);
+                  const depName = getDisplayLocation(room.departure);
+                  const destName = getDisplayLocation(room.destination);
+                  const url = `https://map.kakao.com/link/from/${depName},${depC.lat},${depC.lng}/to/${destName},${destC.lat},${destC.lng}`;
+                  window.open(url, '_blank');
+                }}
+                style={{ flex: 2, height: '46px', background: '#FEE500', border: 'none', borderRadius: '14px', fontSize: '13px', fontWeight: '800', color: '#3C1E1E', cursor: 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '6px' }}
+              >
+                🚕 카카오맵 앱으로 보기
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* 6-A. 동승자 평가 모달 */}
+      {showRatingModal && (() => {
+        // 평가 대상: 나를 제외한 모든 참여자 (방장 포함)
+        const allParticipants = [
+          ...(room.host && room.host.id !== user.id ? [{ id: room.created_by, student_id: room.host.student_id, gender: room.host.gender, label: '방장' }] : []),
+          ...acceptedApplicants
+            .filter(a => a.user_id !== user.id)
+            .map(a => ({ id: a.user_id, student_id: a.user.student_id, gender: a.user.gender, label: '동승자' }))
+        ];
+
+        const handleSubmitRatings = async () => {
+          try {
+            for (const p of allParticipants) {
+              const score = ratingScores[p.id] || 5;
+              await api.ratings.submit(roomId, user.id, p.id, score);
+            }
+            setShowRatingModal(false);
+            setRatingSubmitted(true);
+          } catch (err) {
+            alert('평가 중 오류가 발생했습니다.');
+          }
+        };
+
+        return (
+          <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.55)', backdropFilter: 'blur(4px)', display: 'flex', alignItems: 'center', justifyContent: 'center', padding: '16px', zIndex: 60 }}>
+            <div style={{ background: '#FFF', borderRadius: '24px', padding: '24px 20px', width: '100%', maxWidth: '340px', boxShadow: '0 20px 60px rgba(0,0,0,0.15)' }}>
+              {/* 헤더 */}
+              <div style={{ textAlign: 'center', marginBottom: '20px' }}>
+                <div style={{ width: '52px', height: '52px', background: '#F5F3FF', borderRadius: '16px', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 12px' }}>
+                  <Star size={26} style={{ color: '#7C3AED' }} fill="#7C3AED" />
+                </div>
+                <h3 style={{ fontSize: '17px', fontWeight: '800', color: '#111827', margin: '0 0 6px' }}>동승자 평가</h3>
+                <p style={{ fontSize: '12px', color: '#6B7280', margin: 0, lineHeight: 1.5 }}>이번 동승은 어떠셨나요?<br />별점을 남겨 신뢰도를 높여주세요.</p>
+              </div>
+
+              {/* 평가 대상 리스트 */}
+              <div style={{ display: 'flex', flexDirection: 'column', gap: '14px', marginBottom: '20px' }}>
+                {allParticipants.length === 0 ? (
+                  <p style={{ textAlign: 'center', fontSize: '13px', color: '#9CA3AF' }}>평가할 동승자가 없습니다.</p>
+                ) : allParticipants.map(p => (
+                  <div key={p.id}>
+                    <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '8px' }}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                        <div style={{ width: '34px', height: '34px', background: '#EFF6FF', borderRadius: '10px', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '14px' }}>
+                          {p.gender === '남' ? '👨' : '👩'}
+                        </div>
+                        <div>
+                          <div style={{ fontSize: '13px', fontWeight: '700', color: '#111827' }}>{p.student_id}</div>
+                          <div style={{ fontSize: '11px', color: '#9CA3AF' }}>{p.label} · {p.gender}학생</div>
+                        </div>
+                      </div>
+                      <div style={{ display: 'flex', gap: '3px' }}>
+                        {[1, 2, 3, 4, 5].map(star => {
+                          const selected = (ratingScores[p.id] || 0) >= star;
+                          const hovered = (ratingHoverMap[p.id] || 0) >= star;
+                          return (
+                            <button
+                              key={star}
+                              type="button"
+                              onClick={() => setRatingScores(prev => ({ ...prev, [p.id]: star }))}
+                              onMouseEnter={() => setRatingHoverMap(prev => ({ ...prev, [p.id]: star }))}
+                              onMouseLeave={() => setRatingHoverMap(prev => ({ ...prev, [p.id]: 0 }))}
+                              style={{ background: 'none', border: 'none', cursor: 'pointer', padding: '2px', lineHeight: 1 }}
+                            >
+                              <Star
+                                size={24}
+                                fill={hovered || selected ? '#F59E0B' : 'none'}
+                                style={{ color: hovered || selected ? '#F59E0B' : '#D1D5DB', transition: 'all 0.1s' }}
+                              />
+                            </button>
+                          );
+                        })}
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+
+              {/* 버튼 */}
+              <div style={{ display: 'flex', gap: '10px' }}>
+                <button
+                  type="button"
+                  onClick={() => setShowRatingModal(false)}
+                  style={{ flex: 1, height: '46px', background: '#F3F4F6', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '600', color: '#6B7280', cursor: 'pointer' }}
+                >
+                  나중에
+                </button>
+                <button
+                  type="button"
+                  onClick={handleSubmitRatings}
+                  disabled={allParticipants.length === 0}
+                  style={{ flex: 2, height: '46px', background: '#7C3AED', border: 'none', borderRadius: '12px', fontSize: '14px', fontWeight: '700', color: '#FFF', cursor: 'pointer', boxShadow: '0 4px 12px rgba(124,58,237,0.3)' }}
+                >
+                  평가 완료 ✓
+                </button>
+              </div>
+            </div>
+          </div>
+        );
+      })()}
+
+      {/* 6-B. Host Taxi Fare Entry Modal */}
       {isFareModalOpen && (
         <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-fade-in">
           <div className="bg-theme-emulator border border-theme-border rounded-3xl p-6 w-full max-w-[340px] shadow-2xl space-y-4 transition-colors">
@@ -1080,7 +1396,7 @@ export default function ChatRoom({ user, roomId, onBack, onGoToManage }) {
                   value={destSearchInput}
                   onChange={e => setDestSearchInput(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && searchKakaoPlaces(destSearchInput, setDestResults)}
-                  placeholder="목적지를 검색하세요 (예: 대진대학교)"
+                  placeholder="목적지를 검색하세요"
                   className="flex-1 px-3 py-2.5 bg-theme-input border border-theme-input-border rounded-xl text-xs focus:outline-none focus:border-theme-input-focus text-theme-text-primary placeholder-theme-text-muted/60 transition-all"
                 />
                 <button

@@ -2,8 +2,18 @@ import Script from "next/script";
 import "./globals.css";
 
 export const metadata = {
-  title: "대진대 택시 타자",
-  description: "대진대 학생들을 위한 실시간 택시 동승 매칭 및 정산 서비스",
+  title: "위티 WeTee",
+  description: "누구나 쓰는 실시간 택시 동승 매칭 & 정산 서비스",
+  manifest: "/manifest.json",
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: "default",
+    title: "위티",
+  },
+  icons: {
+    icon: "/icons/icon-192.svg",
+    apple: "/icons/icon-192.svg",
+  },
 };
 
 export const viewport = {
@@ -11,6 +21,7 @@ export const viewport = {
   initialScale: 1,
   maximumScale: 1,
   userScalable: false,
+  themeColor: "#2563EB",
 };
 
 export default function RootLayout({ children }) {

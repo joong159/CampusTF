@@ -17,9 +17,9 @@ const setStorageItem = (key, value) => {
 if (isBrowser) {
   if (!localStorage.getItem('mock_profiles')) {
     setStorageItem('mock_profiles', [
-      { id: 'user-1', email: 'test1@daejin.ac.kr', student_id: '20201234', gender: '남' },
-      { id: 'user-2', email: 'test2@daejin.ac.kr', student_id: '20215678', gender: '여' },
-      { id: 'user-3', email: 'test3@daejin.ac.kr', student_id: '20229876', gender: '남' },
+      { id: 'user-1', email: 'test1@daejin.ac.kr', student_id: '20201234', gender: '남', university: '대진대학교' },
+      { id: 'user-2', email: 'test2@daejin.ac.kr', student_id: '20215678', gender: '여', university: '대진대학교' },
+      { id: 'user-3', email: 'test3@daejin.ac.kr', student_id: '20229876', gender: '남', university: '대진대학교' },
     ]);
   }
   if (!localStorage.getItem('mock_rooms')) {
@@ -65,6 +65,9 @@ if (isBrowser) {
       { id: 'msg-2', room_id: 'room-1', sender_id: 'user-3', content: '네, 알겠습니다. 5분 뒤에 도착합니다!', created_at: new Date(Date.now() - 1000 * 60 * 2).toISOString() },
     ]);
   }
+  if (!localStorage.getItem('mock_ratings')) {
+    setStorageItem('mock_ratings', []);
+  }
 }
 
 export const supabaseMock = {
@@ -72,18 +75,19 @@ export const supabaseMock = {
     signUp: async ({ email, password, options }) => {
       const student_id = options?.data?.student_id || '';
       const gender = options?.data?.gender || '남';
-      
+      const university = options?.data?.university || '';
+
       const profiles = getStorageItem('mock_profiles', []);
       if (profiles.some(p => p.email === email)) {
         return { data: null, error: { message: '이미 가입된 이메일 주소입니다.' } };
       }
-      
+
       const userId = 'user-' + Math.random().toString(36).substr(2, 9);
-      const newProfile = { id: userId, email, student_id, gender };
+      const newProfile = { id: userId, email, student_id, gender, university };
       profiles.push(newProfile);
       setStorageItem('mock_profiles', profiles);
-      
-      const session = { user: { id: userId, email, user_metadata: { student_id, gender } } };
+
+      const session = { user: { id: userId, email, user_metadata: { student_id, gender, university } } };
       setStorageItem('mock_current_session', session);
       return { data: session, error: null };
     },
@@ -247,6 +251,33 @@ export const supabaseMock = {
       setStorageItem('mock_chats', chats);
       if (isBrowser) window.dispatchEvent(new Event('storage'));
       return { data: newMsg, error: null };
-    }
+    },
+
+    submitRating: async ({ room_id, rater_id, ratee_id, score }) => {
+      const ratings = getStorageItem('mock_ratings', []);
+      const exists = ratings.some(r => r.room_id === room_id && r.rater_id === rater_id && r.ratee_id === ratee_id);
+      if (exists) return { error: { message: '이미 평가한 사용자입니다.' } };
+      const newRating = {
+        id: 'rating-' + Math.random().toString(36).substr(2, 9),
+        room_id, rater_id, ratee_id, score,
+        created_at: new Date().toISOString()
+      };
+      ratings.push(newRating);
+      setStorageItem('mock_ratings', ratings);
+      return { data: newRating, error: null };
+    },
+
+    getAverageRating: (userId) => {
+      const ratings = getStorageItem('mock_ratings', []);
+      const userRatings = ratings.filter(r => r.ratee_id === userId);
+      if (userRatings.length === 0) return null;
+      const avg = userRatings.reduce((sum, r) => sum + r.score, 0) / userRatings.length;
+      return { average: Math.round(avg * 10) / 10, count: userRatings.length };
+    },
+
+    hasRated: (room_id, rater_id, ratee_id) => {
+      const ratings = getStorageItem('mock_ratings', []);
+      return ratings.some(r => r.room_id === room_id && r.rater_id === rater_id && r.ratee_id === ratee_id);
+    },
   }
 };

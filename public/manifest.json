@@ -1,0 +1,25 @@
+{
+  "name": "위티 WeTee",
+  "short_name": "위티",
+  "description": "누구나 쓰는 실시간 택시 동승 매칭 & 정산 서비스",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#EEF2FF",
+  "theme_color": "#2563EB",
+  "orientation": "portrait",
+  "lang": "ko",
+  "categories": ["travel", "transportation", "lifestyle"],
+  "icons": [
+    { "src": "/icons/icon-192.svg", "sizes": "192x192", "type": "image/svg+xml", "purpose": "any maskable" },
+    { "src": "/icons/icon-512.svg", "sizes": "512x512", "type": "image/svg+xml", "purpose": "any maskable" }
+  ],
+  "shortcuts": [
+    {
+      "name": "방 만들기",
+      "short_name": "방 만들기",
+      "description": "새 택시 팟 개설",
+      "url": "/",
+      "icons": [{ "src": "/icons/icon-192.svg", "sizes": "192x192" }]
+    }
+  ]
+}

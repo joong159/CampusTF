@@ -106,7 +106,7 @@ export const getDisplayLocation = (locationStr) => {
   return locationStr.includes('|') ? locationStr.split('|')[0] : locationStr;
 };
 
-export default function KakaoMap({ departure, destination, onRouteInfoUpdate, midwayCoords }) {
+export default function KakaoMap({ departure, destination, onRouteInfoUpdate, midwayCoords, mapHeight }) {
   const mapContainerRef = useRef(null);
   const leafletMapContainerRef = useRef(null);
   
@@ -521,7 +521,7 @@ export default function KakaoMap({ departure, destination, onRouteInfoUpdate, mi
   };
 
   return (
-    <div className="w-full h-24 rounded-lg overflow-hidden border border-theme-border relative shadow-inner">
+    <div className={`w-full ${mapHeight ?? 'h-24'} rounded-lg overflow-hidden border border-theme-border relative shadow-inner`}>
       {/* Map rendering layer */}
       {isLeafletMode ? (
         <div ref={leafletMapContainerRef} className="w-full h-full animate-fade-in" style={{ backgroundColor: '#e5e7eb' }} />
